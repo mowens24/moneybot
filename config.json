@@ -1,0 +1,14 @@
+{
+    "strategy": {
+        "spread_bps": 10,
+        "volume": 1.0,
+        "symbol": "BTCUSDT"
+    },
+    "exchange": {
+        "websocket_host": "testnet.binance.vision",
+        "websocket_port": "443",
+        "websocket_endpoint": "/stream?streams=btcusdt@depth10@100ms",
+        "api_key": "YOUR_TESTNET_API_KEY",
+        "secret_key": "YOUR_TESTNET_SECRET_KEY"
+    }
+}

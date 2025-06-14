@@ -1,0 +1,10 @@
+bin/
+build/
+*.o
+*.log
+.DS_Store
+Dockerfile*
+.dockerignore
+logs/
+lib/spdlog/.git
+lib/json/.git
