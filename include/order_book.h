@@ -15,6 +15,8 @@ namespace moneybot {
         ~OrderBook();
         void update(const nlohmann::json& depth_data);
         std::pair<double, double> getBestBidAsk() const;
+        double getBestBid() const;
+        double getBestAsk() const;
         void flushBatch();
         void pruneOldData(int64_t max_age_ms);
     private:

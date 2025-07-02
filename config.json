@@ -1,14 +1,54 @@
 {
     "strategy": {
-        "spread_bps": 10,
-        "volume": 1.0,
-        "symbol": "BTCUSDT"
+        "symbol": "BTCUSDT",
+        "type": "market_maker",
+        "config": {
+            "spread_bps": 5.0,
+            "order_size": 0.001,
+            "max_position": 0.01,
+            "rebalance_threshold": 0.005,
+            "refresh_interval_ms": 1000,
+            "min_spread_bps": 2.0,
+            "max_slippage_bps": 10.0,
+            "aggressive_rebalancing": false
+        }
     },
     "exchange": {
-        "websocket_host": "testnet.binance.vision",
-        "websocket_port": "443",
-        "websocket_endpoint": "/stream?streams=btcusdt@depth10@100ms",
-        "api_key": "YOUR_TESTNET_API_KEY",
-        "secret_key": "YOUR_TESTNET_SECRET_KEY"
+        "websocket_host": "stream.binance.us",
+        "websocket_port": "9443",
+        "websocket_endpoint": "/ws/btcusdt@depth10@100ms",
+        "websocket_subscription": {
+            "method": "SUBSCRIBE",
+            "params": ["btcusdt@depth10@100ms", "btcusdt@trade"],
+            "id": 1
+        },
+        "user_agent": "MoneyBot/1.0",
+        "rest_api": {
+            "base_url": "https://api.binance.us",
+            "api_key": "your_api_key_here",
+            "secret_key": "your_secret_key_here",
+            "testnet": false
+        }
+    },
+    "risk": {
+        "max_position_size": 0.1,
+        "max_order_size": 0.01,
+        "max_daily_loss": -100.0,
+        "max_drawdown": -50.0,
+        "max_orders_per_minute": 60,
+        "min_spread": 0.0001,
+        "max_slippage": 0.001
+    },
+    "logging": {
+        "level": "info",
+        "file": "logs/moneybot.log",
+        "max_file_size": "10MB",
+        "max_files": 5
+    },
+    "performance": {
+        "enable_metrics": true,
+        "metrics_interval_ms": 5000,
+        "save_trades": true,
+        "save_orderbook": false
     }
 }

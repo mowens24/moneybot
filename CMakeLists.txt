@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 project(MoneyBot)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Boost REQUIRED COMPONENTS system thread)
@@ -27,6 +27,10 @@ add_executable(moneybot
     src/order_book.cpp
     src/logger.cpp
     src/data_analyzer.cpp
+    src/types.cpp
+    src/risk_manager.cpp
+    src/market_maker_strategy.cpp
+    src/order_manager.cpp
 )
 
 target_link_libraries(moneybot
@@ -35,7 +39,6 @@ target_link_libraries(moneybot
     ${OPENSSL_LIBRARIES}
     ${SQLite3_LIBRARIES}
     spdlog::spdlog
-    uuid
 )
 
 add_custom_command(TARGET moneybot POST_BUILD

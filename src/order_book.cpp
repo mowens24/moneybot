@@ -148,4 +148,18 @@ namespace moneybot {
         }
         return {0.0, 0.0};
     }
+
+    double OrderBook::getBestBid() const {
+        if (!bids_.empty()) {
+            return bids_.begin()->first;
+        }
+        return 0.0;
+    }
+
+    double OrderBook::getBestAsk() const {
+        if (!asks_.empty()) {
+            return asks_.begin()->first;
+        }
+        return 0.0;
+    }
 } // namespace moneybot
