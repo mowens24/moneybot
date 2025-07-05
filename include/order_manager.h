@@ -38,16 +38,19 @@ public:
     
     // Configuration
     void updateConfig(const nlohmann::json& config);
+    
+    // User data stream
+    std::string createUserDataStream();
+
+    // WebSocket handlers (made public for event routing)
+    void handleOrderUpdate(const nlohmann::json& data);
+    void handleAccountUpdate(const nlohmann::json& data);
 
 private:
     // REST API methods
     nlohmann::json makeRequest(const std::string& endpoint, const std::string& method = "GET", 
                               const nlohmann::json& data = {});
     std::string signRequest(const std::string& query_string);
-    
-    // WebSocket handlers
-    void handleOrderUpdate(const nlohmann::json& data);
-    void handleAccountUpdate(const nlohmann::json& data);
     
     // Internal helpers
     std::string generateClientOrderId();
@@ -85,4 +88,4 @@ private:
 
 } // namespace moneybot
 
-#endif // ORDER_MANAGER_H 
+#endif // ORDER_MANAGER_H

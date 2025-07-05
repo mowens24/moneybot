@@ -88,20 +88,26 @@ namespace moneybot {
             co_await ws->async_handshake(host, endpoint, use_awaitable);
             logger->info("WebSocket handshake successful.");
 
-            // Subscribe to streams
-            json subscribe = self->config_["exchange"]["websocket_subscription"];
-            co_await ws->async_write(net::buffer(subscribe.dump()), use_awaitable);
-            logger->info("Subscribed to streams");
+            // Only send subscription message if using combined stream endpoint
+            if (endpoint.rfind("/stream", 0) == 0) {
+                json subscribe = self->config_["exchange"]["websocket_subscription"];
+                co_await ws->async_write(net::buffer(subscribe.dump()), use_awaitable);
+                logger->info("Subscribed to streams");
+            }
 
             for (;;) {
                 buffer.clear();
                 co_await ws->async_read(buffer, use_awaitable);
                 auto data = beast::buffers_to_string(buffer.data());
                 logger->debug("Received data: {}", data);
-                
                 try {
                     json j = json::parse(data);
-                    self->processMessage(j);
+                    // Handle combined stream payloads
+                    if (j.contains("stream") && j.contains("data")) {
+                        self->processMessage(j["data"]);
+                    } else {
+                        self->processMessage(j);
+                    }
                 } catch (const std::exception& e) {
                     logger->error("Failed to process data: {}", e.what());
                 }
@@ -159,6 +165,64 @@ namespace moneybot {
                 return connectWebSocket(self, host, port, endpoint);
             },
             detached);
+        ioc_.run();
+    }
+
+    void Network::runUserDataStream(const std::string& listenKey) {
+        using namespace std::chrono_literals;
+        std::string host = "stream.binance.us";
+        std::string port = "9443";
+        std::string endpoint = "/ws/" + listenKey;
+        auto logger = logger_->getLogger();
+        auto& ws = ws_;
+        auto& buffer = buffer_;
+
+        co_spawn(ioc_, [self = shared_from_this(), host, port, endpoint, logger, &ws, &buffer]() -> net::awaitable<void> {
+            try {
+                ws = std::make_unique<beast::websocket::stream<beast::ssl_stream<beast::tcp_stream>>>(
+                    co_await this_coro::executor, self->ssl_ctx_);
+                ws->set_option(beast::websocket::stream_base::decorator([&self](beast::websocket::request_type& req) {
+                    req.set(beast::http::field::user_agent, "MoneyBot/1.0");
+                }));
+                if (!SSL_set_tlsext_host_name(ws->next_layer().native_handle(), host.c_str())) {
+                    throw beast::system_error{
+                        beast::error_code{static_cast<int>(::ERR_get_error()), net::error::get_ssl_category()},
+                        "Failed to set SNI"};
+                }
+                net::ip::tcp::resolver resolver(co_await this_coro::executor);
+                auto results = co_await resolver.async_resolve(host, port, use_awaitable);
+                co_await beast::get_lowest_layer(ws->next_layer()).async_connect(results, use_awaitable);
+                logger->info("TCP connected to {}:{} (user data stream)", host, port);
+                co_await ws->next_layer().async_handshake(ssl::stream_base::client, use_awaitable);
+                logger->info("SSL handshake successful (user data stream)");
+                co_await ws->async_handshake(host, endpoint, use_awaitable);
+                logger->info("WebSocket handshake successful (user data stream)");
+                for (;;) {
+                    buffer.clear();
+                    co_await ws->async_read(buffer, use_awaitable);
+                    auto data = beast::buffers_to_string(buffer.data());
+                    logger->debug("[UserData] Received data: {}", data);
+                    try {
+                        json j = json::parse(data);
+                        // Route to order/account update handlers if present
+                        if (j.contains("e")) {
+                            std::string event_type = j["e"].get<std::string>();
+                            if (event_type == "executionReport") {
+                                if (self->order_manager_)
+                                    self->order_manager_->handleOrderUpdate(j);
+                            } else if (event_type == "outboundAccountPosition") {
+                                if (self->order_manager_)
+                                    self->order_manager_->handleAccountUpdate(j);
+                            }
+                        }
+                    } catch (const std::exception& e) {
+                        logger->error("[UserData] Failed to process data: {}", e.what());
+                    }
+                }
+            } catch (const std::exception& e) {
+                logger->error("User data WebSocket connection failed: {}", e.what());
+            }
+        }, detached);
         ioc_.run();
     }
 

@@ -101,22 +101,54 @@ int main(int argc, char* argv[]) {
         moneybot::TradingEngine engine(config);
         engine.start();
         
+        // --- Enhanced Spinner and Order Book Spread Visual ---
+        const char* spinner[] = {"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏", "⠋", "⠙", "⠚", "⠞", "⠖", "⠦", "⠴", "⠲", "⠳", "⠓"};
+        int spinner_idx = 0;
+        std::string last_status_line;
         // Main loop
         while (running) {
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-            
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            // Get live metrics
+            auto metrics = engine.getPerformanceMetrics();
+            auto status = engine.getStatus();
+            int64_t uptime = status["uptime_seconds"].get<int64_t>();
+            double pnl = metrics["total_pnl"].get<double>();
+            int trades = metrics["total_trades"].get<int>();
+            double avg_pnl = metrics["avg_pnl_per_trade"].get<double>();
+            // --- Order book spread visual ---
+            double bid = engine.getBestBid();
+            double ask = engine.getBestAsk();
+            double spread = ask > 0 && bid > 0 ? ask - bid : 0.0;
+            // Visual: |====|    |====|, gap proportional to spread (max 20 spaces)
+            int gap = (spread > 0 && bid > 0) ? std::min(20, static_cast<int>(spread / (bid * 0.0001))) : 5;
+            std::string spread_bar = "|" + std::string(5, '=') + "|" + std::string(gap, ' ') + "|" + std::string(5, '=') + "|";
+            // --- Connection status ---
+            std::string ws_status = engine.isWsConnected() ? "🟢" : "🔴";
+            // --- Last event ---
+            std::string last_event = engine.getLastEvent();
+            // --- Compose status line ---
+            std::ostringstream oss;
+            oss << "[" << spinner[spinner_idx] << "] " << ws_status << " "
+                << "Trades: " << trades
+                << " | PnL: $" << std::fixed << std::setprecision(2) << pnl
+                << " | Avg/trade: $" << std::fixed << std::setprecision(2) << avg_pnl
+                << " | Uptime: " << uptime << "s "
+                << "| Last: " << last_event
+                << " | Bid: " << bid << " Ask: " << ask << " Spread: " << spread
+                << "\n    " << spread_bar << "   ";
+            std::string status_line = oss.str();
+            // Overwrite previous line
+            std::cout << "\r" << status_line << std::flush;
+            last_status_line = status_line;
+            spinner_idx = (spinner_idx + 1) % 20;
             // Print status every 30 seconds
             static int counter = 0;
-            if (++counter % 30 == 0) {
-                auto status = engine.getStatus();
-                auto metrics = engine.getPerformanceMetrics();
-                
+            if (++counter % 150 == 0) {
                 std::cout << "\n=== Status Update ===" << std::endl;
                 std::cout << "Running: " << (status["running"].get<bool>() ? "Yes" : "No") << std::endl;
-                std::cout << "Uptime: " << status["uptime_seconds"].get<int64_t>() << " seconds" << std::endl;
-                std::cout << "Total PnL: $" << std::fixed << std::setprecision(2) << metrics["total_pnl"].get<double>() << std::endl;
-                std::cout << "Total Trades: " << metrics["total_trades"].get<int>() << std::endl;
-                
+                std::cout << "Uptime: " << uptime << " seconds" << std::endl;
+                std::cout << "Total PnL: $" << std::fixed << std::setprecision(2) << pnl << std::endl;
+                std::cout << "Total Trades: " << trades << std::endl;
                 if (status.contains("risk")) {
                     auto risk = status["risk"];
                     std::cout << "Emergency Stop: " << (risk["emergency_stopped"].get<bool>() ? "Yes" : "No") << std::endl;
@@ -124,7 +156,8 @@ int main(int argc, char* argv[]) {
                 }
             }
         }
-        
+        // Clear spinner line before shutdown
+        std::cout << "\r" << std::string(last_status_line.size(), ' ') << "\r";
         std::cout << "\nShutting down..." << std::endl;
         engine.stop();
         

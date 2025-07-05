@@ -2,6 +2,7 @@
 
 #include "logger.h"
 #include "order_book.h"
+#include "order_manager.h"
 #include <boost/asio.hpp>
 #include <boost/asio/awaitable.hpp>
 #include <boost/asio/co_spawn.hpp>
@@ -25,6 +26,10 @@ namespace moneybot {
         void run(const std::string& host, const std::string& port,
                  const std::string& endpoint);
         void stop();
+        // Connect to user data WebSocket
+        void runUserDataStream(const std::string& listenKey);
+        // Set order manager for user data event routing
+        void setOrderManager(std::shared_ptr<OrderManager> order_manager) { order_manager_ = order_manager; }
 
     private:
         static net::awaitable<void>
@@ -33,6 +38,7 @@ namespace moneybot {
         void processMessage(const json& message);
         std::shared_ptr<Logger> logger_;
         std::shared_ptr<OrderBook> order_book_;
+        std::shared_ptr<OrderManager> order_manager_;
         const json& config_;
         net::io_context ioc_;
         net::ssl::context ssl_ctx_;
@@ -40,4 +46,4 @@ namespace moneybot {
         beast::multi_buffer buffer_;
         net::strand<net::any_io_executor> strand_;
     };
-} // namespace moneybot 
+} // namespace moneybot

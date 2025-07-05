@@ -31,6 +31,25 @@ namespace moneybot {
         // Configuration
         void updateConfig(const nlohmann::json& config);
         
+        // --- Live status helpers ---
+        std::pair<double, double> getBestBidAsk() const {
+            if (order_book_) return order_book_->getBestBidAsk();
+            return {0.0, 0.0};
+        }
+        double getBestBid() const {
+            if (order_book_) return order_book_->getBestBid();
+            return 0.0;
+        }
+        double getBestAsk() const {
+            if (order_book_) return order_book_->getBestAsk();
+            return 0.0;
+        }
+        std::string getLastEvent() const { return last_event_; }
+        void setLastEvent(const std::string& evt) { last_event_ = evt; }
+        bool isWsConnected() const { return ws_connected_; }
+        void setWsConnected(bool v) { ws_connected_ = v; }
+        // --- End live status helpers ---
+        
     private:
         // Event handlers
         void onOrderBookUpdate(const OrderBook& order_book);
@@ -75,6 +94,10 @@ namespace moneybot {
         // Thread safety
         mutable std::mutex config_mutex_;
         mutable std::mutex status_mutex_;
+        
+        // Live status helpers
+        std::string last_event_;
+        bool ws_connected_;
     };
 } // namespace moneybot
 

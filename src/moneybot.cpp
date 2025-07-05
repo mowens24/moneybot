@@ -6,7 +6,8 @@ namespace moneybot {
 
 TradingEngine::TradingEngine(const nlohmann::json& config) 
     : config_(config), running_(false), emergency_stop_(false),
-      total_pnl_(0.0), total_trades_(0), start_time_(std::chrono::system_clock::now()) {
+      total_pnl_(0.0), total_trades_(0), start_time_(std::chrono::system_clock::now()),
+      last_event_("init"), ws_connected_(false) {
     loadConfig(config);
     initializeComponents();
     logger_->getLogger()->info("TradingEngine initialized successfully");
@@ -23,6 +24,7 @@ void TradingEngine::initializeComponents() {
     network_ = std::make_shared<Network>(logger_, order_book_, config_);
     order_manager_ = std::make_shared<OrderManager>(logger_, config_);
     risk_manager_ = std::make_shared<RiskManager>(logger_, config_);
+    network_->setOrderManager(order_manager_);
     
     // Initialize strategy based on config
     std::string strategy_type = config_["strategy"]["type"].get<std::string>();
@@ -53,7 +55,17 @@ void TradingEngine::start() {
     
     // Start order manager
     order_manager_->start();
-    
+
+    // Start user data stream for private events
+    std::string listenKey = order_manager_->createUserDataStream();
+    if (!listenKey.empty()) {
+        std::thread([this, listenKey]() {
+            network_->runUserDataStream(listenKey);
+        }).detach();
+    } else {
+        logger_->getLogger()->error("Failed to start user data stream: listenKey is empty");
+    }
+
     // Start network thread
     running_.store(true);
     network_thread_ = std::thread(&TradingEngine::networkThread, this);
@@ -128,7 +140,7 @@ void TradingEngine::strategyThread() {
 
 void TradingEngine::onOrderBookUpdate(const OrderBook& order_book) {
     if (emergency_stop_.load()) return;
-    
+    setLastEvent("OrderBookUpdate");
     try {
         strategy_->onOrderBookUpdate(order_book);
     } catch (const std::exception& e) {
@@ -138,7 +150,7 @@ void TradingEngine::onOrderBookUpdate(const OrderBook& order_book) {
 
 void TradingEngine::onTrade(const Trade& trade) {
     if (emergency_stop_.load()) return;
-    
+    setLastEvent("Trade");
     try {
         strategy_->onTrade(trade);
         total_trades_++;
@@ -149,7 +161,7 @@ void TradingEngine::onTrade(const Trade& trade) {
 
 void TradingEngine::onOrderAck(const OrderAck& ack) {
     if (emergency_stop_.load()) return;
-    
+    setLastEvent("OrderAck");
     try {
         strategy_->onOrderAck(ack);
     } catch (const std::exception& e) {
@@ -159,7 +171,7 @@ void TradingEngine::onOrderAck(const OrderAck& ack) {
 
 void TradingEngine::onOrderReject(const OrderReject& reject) {
     if (emergency_stop_.load()) return;
-    
+    setLastEvent("OrderReject");
     try {
         strategy_->onOrderReject(reject);
     } catch (const std::exception& e) {
@@ -169,7 +181,7 @@ void TradingEngine::onOrderReject(const OrderReject& reject) {
 
 void TradingEngine::onOrderFill(const OrderFill& fill) {
     if (emergency_stop_.load()) return;
-    
+    setLastEvent("OrderFill");
     try {
         strategy_->onOrderFill(fill);
         total_pnl_ += fill.commission; // Simplified PnL calculation
@@ -196,6 +208,8 @@ nlohmann::json TradingEngine::getStatus() const {
     status["emergency_stop"] = emergency_stop_.load();
     status["uptime_seconds"] = std::chrono::duration_cast<std::chrono::seconds>(
         std::chrono::system_clock::now() - start_time_).count();
+    status["last_event"] = last_event_;
+    status["ws_connected"] = ws_connected_;
     
     // Risk status
     if (risk_manager_) {

@@ -429,4 +429,45 @@ void OrderManager::registerCallbacks(const std::string& order_id, OrderCallback 
     callbacks_[order_id] = callbacks;
 }
 
-} // namespace moneybot 
+std::string OrderManager::createUserDataStream() {
+    try {
+        std::string host = base_url_.substr(base_url_.find("://") + 3);
+        std::string port = "443";
+        std::string path = "/api/v3/userDataStream";
+
+        // Create HTTP POST request
+        boost::beast::http::request<boost::beast::http::string_body> req;
+        req.method(boost::beast::http::verb::post);
+        req.target(path);
+        req.version(11);
+        req.set(boost::beast::http::field::host, host);
+        req.set(boost::beast::http::field::user_agent, "MoneyBot/1.0");
+        if (!api_key_.empty()) {
+            req.set("X-MBX-APIKEY", api_key_);
+        }
+        req.body() = "";
+        req.prepare_payload();
+
+        // Make HTTPS request (using plain TCP for now, should use SSL in production)
+        boost::asio::ip::tcp::resolver resolver(ioc_);
+        auto const results = resolver.resolve(host, port);
+        boost::asio::ip::tcp::socket socket(ioc_);
+        boost::asio::connect(socket, results.begin(), results.end());
+        boost::beast::http::write(socket, req);
+        boost::beast::flat_buffer buffer;
+        boost::beast::http::response<boost::beast::http::string_body> res;
+        boost::beast::http::read(socket, buffer, res);
+        nlohmann::json response = nlohmann::json::parse(res.body());
+        logger_->getLogger()->info("User data stream response: {}", response.dump());
+        if (response.contains("listenKey")) {
+            return response["listenKey"].get<std::string>();
+        }
+        logger_->getLogger()->error("Failed to get listenKey from user data stream response");
+        return "";
+    } catch (const std::exception& e) {
+        logger_->getLogger()->error("Failed to create user data stream: {}", e.what());
+        return "";
+    }
+}
+
+} // namespace moneybot
