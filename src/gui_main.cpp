@@ -1,5 +1,6 @@
 // Minimal ImGui GUI for MoneyBot
 #include "moneybot.h"
+
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
@@ -8,6 +9,10 @@
 #include <chrono>
 #include <memory>
 #include <fstream> // For std::ifstream
+#include <unistd.h>
+#include <pty.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 using namespace moneybot;
 
@@ -37,6 +42,14 @@ int main(int argc, char** argv) {
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
 
+
+    // --- Interactive Zsh Terminal State ---
+    static int pty_master = -1;
+    static pid_t shell_pid = -1;
+    static std::string terminal_output;
+    static char input_buffer[256] = "";
+    static bool terminal_running = false;
+
     // Main loop
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
@@ -63,6 +76,83 @@ int main(int argc, char** argv) {
         // Spread bar visual
         float spread_norm = (spread > 0 && bid > 0) ? std::min(1.0f, float(spread / (bid * 0.001f))) : 0.0f;
         ImGui::ProgressBar(spread_norm, ImVec2(300, 0), "Spread");
+        ImGui::End();
+
+
+        // --- Interactive Zsh Terminal Window ---
+        ImGui::Begin("Interactive Zsh Terminal (PTY)");
+        if (!terminal_running) {
+            if (ImGui::Button("Start Interactive Zsh")) {
+                int master_fd;
+                int slave_fd;
+                struct winsize ws = {24, 80, 0, 0};
+                pid_t pid = forkpty(&master_fd, NULL, NULL, &ws);
+                if (pid == 0) {
+                    // Child: exec zsh
+                    execlp("zsh", "zsh", (char*)NULL);
+                    _exit(1);
+                } else if (pid > 0) {
+                    // Parent
+                    // Set PTY master to non-blocking
+                    #include <fcntl.h>
+                    int flags = fcntl(master_fd, F_GETFL, 0);
+                    fcntl(master_fd, F_SETFL, flags | O_NONBLOCK);
+                    pty_master = master_fd;
+                    shell_pid = pid;
+                    terminal_running = true;
+                    terminal_output.clear();
+                    memset(input_buffer, 0, sizeof(input_buffer));
+                }
+            }
+        } else {
+            // --- Robust PTY read and shell monitoring ---
+            bool shell_alive = true;
+            if (shell_pid > 0) {
+                int status = 0;
+                pid_t result = waitpid(shell_pid, &status, WNOHANG);
+                if (result == shell_pid) {
+                    // Shell exited
+                    shell_alive = false;
+                }
+            } else {
+                shell_alive = false;
+            }
+            if (pty_master >= 0 && shell_alive) {
+                char buf[256];
+                ssize_t n;
+                while ((n = read(pty_master, buf, sizeof(buf)-1)) > 0) {
+                    buf[n] = 0;
+                    terminal_output += buf;
+                }
+                // Input box
+                ImGui::InputText("Input", input_buffer, sizeof(input_buffer), ImGuiInputTextFlags_EnterReturnsTrue);
+                if (ImGui::IsItemDeactivatedAfterEdit() && strlen(input_buffer) > 0) {
+                    std::string cmd = std::string(input_buffer) + "\n";
+                    write(pty_master, cmd.c_str(), cmd.size());
+                    memset(input_buffer, 0, sizeof(input_buffer));
+                }
+                if (ImGui::Button("Stop Terminal")) {
+                    kill(shell_pid, SIGKILL);
+                    close(pty_master);
+                    pty_master = -1;
+                    shell_pid = -1;
+                    terminal_running = false;
+                }
+            } else {
+                // Shell exited or PTY closed
+                if (pty_master >= 0) {
+                    close(pty_master);
+                    pty_master = -1;
+                }
+                shell_pid = -1;
+                terminal_running = false;
+                ImGui::TextColored(ImVec4(1,0,0,1), "[Shell exited]");
+            }
+        }
+        ImGui::BeginChild("TerminalOutput", ImVec2(0, 300), true);
+        ImGui::TextUnformatted(terminal_output.c_str());
+        ImGui::SetScrollHereY(1.0f); // Auto-scroll to bottom
+        ImGui::EndChild();
         ImGui::End();
 
         ImGui::Render();
