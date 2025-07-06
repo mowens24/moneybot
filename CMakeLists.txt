@@ -38,6 +38,8 @@ add_executable(moneybot
     src/risk_manager.cpp
     src/market_maker_strategy.cpp
     src/order_manager.cpp
+    src/backtest_engine.cpp
+    src/strategy_factory.cpp
 )
 
 target_link_libraries(moneybot
@@ -98,3 +100,5 @@ target_link_libraries(moneybot_gui
     ${SQLite3_LIBRARIES}
     spdlog::spdlog
 )
+
+install(FILES include/dummy_strategy.h DESTINATION include)

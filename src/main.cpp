@@ -1,6 +1,8 @@
 #include "moneybot.h"
 #include "logger.h"
 #include "data_analyzer.h"
+#include "backtest_engine.h"
+#include "strategy_factory.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <iostream>
@@ -23,6 +25,7 @@ void printUsage(const char* program) {
               << "  --config FILE Use custom config file (default: config.json)\n"
               << "  --help        Show this help message\n"
               << "  --dry-run     Run without placing real orders\n"
+              << "  --backtest    Run in backtest mode with historical data\n"
               << std::endl;
 }
 
@@ -33,7 +36,9 @@ int main(int argc, char* argv[]) {
     std::string config_file = "config.json";
     bool analyze_mode = false;
     bool dry_run = false;
-    
+    bool backtest_mode = false;
+    std::string backtest_data = "data/ticks.db";
+
     // Parse command line arguments
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -51,22 +56,16 @@ int main(int argc, char* argv[]) {
             }
         } else if (arg == "--dry-run") {
             dry_run = true;
+        } else if (arg == "--backtest") {
+            backtest_mode = true;
+            if (i + 1 < argc && argv[i+1][0] != '-') {
+                backtest_data = argv[++i];
+            }
         } else {
             std::cerr << "Unknown option: " << arg << std::endl;
             printUsage(argv[0]);
             return 1;
         }
-    }
-
-    if (analyze_mode) {
-        auto logger = std::make_shared<moneybot::Logger>();
-        moneybot::DataAnalyzer analyzer(logger);
-        std::cout << "=== Data Analysis Mode ===" << std::endl;
-        std::cout << "Average Spread: " << analyzer.computeAverageSpread() << std::endl;
-        std::cout << "VWAP (Bids): " << analyzer.computeVWAP(true) << std::endl;
-        auto ticks = analyzer.getTicksByTime("BTCUSDT", 0, std::numeric_limits<int64_t>::max());
-        std::cout << "Total ticks: " << ticks.size() << std::endl;
-        return 0;
     }
 
     // Load configuration
@@ -89,6 +88,35 @@ int main(int argc, char* argv[]) {
         config["exchange"]["rest_api"]["api_key"] = "dry_run_mode";
         config["exchange"]["rest_api"]["secret_key"] = "dry_run_mode";
         std::cout << "Running in DRY-RUN mode (no real orders will be placed)" << std::endl;
+    }
+
+    if (analyze_mode) {
+        auto logger = std::make_shared<moneybot::Logger>();
+        moneybot::DataAnalyzer analyzer(logger);
+        std::cout << "=== Data Analysis Mode ===" << std::endl;
+        std::cout << "Average Spread: " << analyzer.computeAverageSpread() << std::endl;
+        std::cout << "VWAP (Bids): " << analyzer.computeVWAP(true) << std::endl;
+        auto ticks = analyzer.getTicksByTime("BTCUSDT", 0, std::numeric_limits<int64_t>::max());
+        std::cout << "Total ticks: " << ticks.size() << std::endl;
+        return 0;
+    }
+
+    if (backtest_mode) {
+        auto logger = std::make_shared<moneybot::Logger>();
+        moneybot::BacktestEngine backtester(config);
+        backtester.setLogger(logger);
+        auto strat = moneybot::createStrategyFromConfig(config);
+        backtester.setStrategy(strat);
+        std::cout << "=== Backtest Mode ===" << std::endl;
+        std::cout << "Loading data from: " << backtest_data << std::endl;
+        auto result = backtester.run(config["strategy"]["symbol"], backtest_data);
+        std::cout << "Backtest complete!" << std::endl;
+        std::cout << "Total PnL: $" << result.total_pnl << std::endl;
+        std::cout << "Max Drawdown: " << result.max_drawdown * 100 << "%" << std::endl;
+        std::cout << "Total Trades: " << result.total_trades << std::endl;
+        std::cout << "Win/Loss: " << result.wins << "/" << result.losses << std::endl;
+        std::cout << "Sharpe Ratio: " << result.sharpe_ratio << std::endl;
+        return 0;
     }
 
     std::cout << "=== MoneyBot HFT Trading System ===" << std::endl;

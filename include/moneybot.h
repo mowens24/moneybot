@@ -1,6 +1,9 @@
 #ifndef MONEYBOT_H
 #define MONEYBOT_H
 
+#include <cstddef>
+#include <cstdint>
+#include <climits>
 #include "logger.h"
 #include "network.h"
 #include "order_book.h"
