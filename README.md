@@ -80,6 +80,41 @@ Or via Docker:
 docker-compose up
 ```
 
+## Graphical Dashboard (ImGui GUI)
+
+MoneyBot now includes a modern real-time dashboard built with Dear ImGui. The GUI displays live trading stats, order book, connection status, and more.
+
+### Prerequisites (for GUI)
+
+- All core prerequisites (see above)
+- [Dear ImGui](https://github.com/ocornut/imgui) (source in `lib/imgui`)
+- [GLFW](https://www.glfw.org/) (install via Homebrew: `brew install glfw`)
+- OpenGL (system-provided on macOS)
+
+### Building the GUI
+
+```sh
+cmake -S . -B build
+cmake --build build
+```
+
+### Running the GUI
+
+```sh
+./build/moneybot_gui
+```
+
+#### macOS OpenGL/GLSL Troubleshooting
+
+- The GUI is configured to use OpenGL 2.1 and GLSL 120 for maximum compatibility on macOS.
+- If you see shader errors, ensure you have the correct GLSL version in `src/gui_main.cpp`:
+  ```cpp
+  const char* glsl_version = "#version 120";
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+  ```
+- Make sure you have installed GLFW via Homebrew and that `/opt/homebrew/lib` is in your library path.
+
 ## Extending Moneybot
 
 - Add new strategies by inheriting from the `Strategy` base class.
