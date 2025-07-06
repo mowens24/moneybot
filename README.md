@@ -68,39 +68,55 @@ docker-compose up --build
 
 Edit `config.json` to set exchange endpoints, API keys, and strategy parameters.
 
-### Running Moneybot
 
+### Running MoneyBot
+
+#### Standard Trading Mode
 ```sh
 ./build/moneybot
 ```
 
-Or via Docker:
+#### Backtesting Mode
+Run historical simulations with your strategy and data:
+```sh
+./build/moneybot --backtest [ticks.db]
+```
+If no file is given, defaults to `data/ticks.db`.
 
+#### Analysis Mode
+Analyze historical data (spread, VWAP, tick count):
+```sh
+./build/moneybot --analyze
+```
+
+#### Dry-Run Mode
+Simulate live trading without placing real orders:
+```sh
+./build/moneybot --dry-run
+```
+
+#### With Docker
 ```sh
 docker-compose up
 ```
 
+
 ## Graphical Dashboard (ImGui GUI)
 
-MoneyBot now includes a modern real-time dashboard built with Dear ImGui. The GUI displays live trading stats, order book, connection status, and more.
+MoneyBot includes a real-time dashboard built with Dear ImGui. The GUI displays live trading stats, order book, and connection status.
 
-### Prerequisites (for GUI)
-
-- All core prerequisites (see above)
-- [Dear ImGui](https://github.com/ocornut/imgui) (source in `lib/imgui`)
-- [GLFW](https://www.glfw.org/) (install via Homebrew: `brew install glfw`)
-- OpenGL (system-provided on macOS)
-
-### Building the GUI
-
+### Building and Running the GUI
 ```sh
 cmake -S . -B build
 cmake --build build
+./build/moneybot_gui
 ```
 
-### Running the GUI
-
+### Running CLI and GUI Together
+Start each in a separate terminal:
 ```sh
+./build/moneybot
+# In another terminal:
 ./build/moneybot_gui
 ```
 
@@ -115,9 +131,13 @@ cmake --build build
   ```
 - Make sure you have installed GLFW via Homebrew and that `/opt/homebrew/lib` is in your library path.
 
-## Extending Moneybot
 
-- Add new strategies by inheriting from the `Strategy` base class.
+## Backtesting & Strategy Development
+
+- Use `--backtest` to simulate strategies on historical data.
+- Use `--analyze` for quick data/statistics reports.
+- Add new strategies by inheriting from the `Strategy` base class (see `DummyStrategy` for a minimal example).
+- The strategy factory (`strategy_factory.h/.cpp`) allows dynamic instantiation from config.
 - Implement new exchange adapters by extending the `Network` component.
 - Use the logging and risk management facilities for robust, safe trading.
 
