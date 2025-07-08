@@ -20,7 +20,7 @@ int main(int argc, char** argv) {
     // Initialize TradingEngine (reuse config.json)
     nlohmann::json config;
     {
-        std::ifstream config_stream("config.json");
+        std::ifstream config_stream("/Users/mwo/moneybot/config.json");
         config_stream >> config;
     }
     auto engine = std::make_shared<TradingEngine>(config);
