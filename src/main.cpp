@@ -11,6 +11,9 @@
 
 using json = nlohmann::json;
 
+// Forward declare GUI main function
+int gui_main(int argc, char** argv);
+
 std::atomic<bool> running(true);
 
 void signalHandler(int signum) {
@@ -21,6 +24,7 @@ void signalHandler(int signum) {
 void printUsage(const char* program) {
     std::cout << "Usage: " << program << " [OPTIONS]\n"
               << "Options:\n"
+              << "  --gui, -g     Launch GUI dashboard mode\n"
               << "  --analyze     Run in analysis mode (no trading)\n"
               << "  --config FILE Use custom config file (default: config.json)\n"
               << "  --help        Show this help message\n"
@@ -45,6 +49,9 @@ int main(int argc, char* argv[]) {
         if (arg == "--help" || arg == "-h") {
             printUsage(argv[0]);
             return 0;
+        } else if (arg == "--gui" || arg == "-g") {
+            std::cout << "Starting MoneyBot GUI mode..." << std::endl;
+            return gui_main(argc, argv);
         } else if (arg == "--analyze") {
             analyze_mode = true;
         } else if (arg == "--config") {

@@ -15,7 +15,7 @@
 
 using namespace moneybot;
 
-int main(int argc, char** argv) {
+int gui_main(int argc, char** argv) {
     // Initialize TradingEngine (reuse config.json)
     nlohmann::json config;
     {

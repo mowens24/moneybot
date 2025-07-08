@@ -69,6 +69,7 @@ include_directories(
 
 add_executable(moneybot
     src/main.cpp
+    src/gui_main.cpp
     src/moneybot.cpp
     src/network.cpp
     src/order_book.cpp
@@ -80,35 +81,6 @@ add_executable(moneybot
     src/order_manager.cpp
     src/backtest_engine.cpp
     src/strategy_factory.cpp
-)
-
-target_link_libraries(moneybot
-    ${Boost_LIBRARIES}
-    ${CURL_LIBRARIES}
-    ${OPENSSL_LIBRARIES}
-    ${SQLite3_LIBRARIES}
-    spdlog::spdlog
-)
-
-add_custom_command(TARGET moneybot POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/logs
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/data
-)
-
-# --- ImGui/GLFW/OpenGL3 GUI build ---
-# You must download ImGui to lib/imgui and GLFW to your system or as a submodule.
-# This block assumes pkg-config for GLFW3 and OpenGL is available.
-
-add_executable(moneybot_gui
-    src/gui_main.cpp
-    src/moneybot.cpp
-    src/network.cpp
-    src/order_book.cpp
-    src/logger.cpp
-    src/types.cpp
-    src/risk_manager.cpp
-    src/market_maker_strategy.cpp
-    src/order_manager.cpp
     src/dashboard_metrics_widget.cpp
     src/dashboard_orderbook_widget.cpp
     # ImGui core files
@@ -125,20 +97,18 @@ add_executable(moneybot_gui
 # --- Workaround for missing pty.h on macOS ---
 if(APPLE)
     # Always add our local compat header for pty.h
-    target_include_directories(moneybot_gui PRIVATE ${CMAKE_SOURCE_DIR}/include/compat)
+    target_include_directories(moneybot PRIVATE ${CMAKE_SOURCE_DIR}/include/compat)
     # Silence OpenGL deprecation warnings on macOS
-    target_compile_definitions(moneybot_gui PRIVATE GL_SILENCE_DEPRECATION)
-    message(STATUS "Added ${CMAKE_SOURCE_DIR}/include/compat to moneybot_gui for pty.h workaround")
+    target_compile_definitions(moneybot PRIVATE GL_SILENCE_DEPRECATION)
+    message(STATUS "Added ${CMAKE_SOURCE_DIR}/include/compat to moneybot for pty.h workaround")
 endif()
 
 # Explicitly add Homebrew's lib path for GLFW
 link_directories(/opt/homebrew/lib)
 
-# Link with GLFW and other dependencies
-# Try both the variable and the direct path for robustness
-# (If you have a different version, adjust the .dylib name accordingly)
+# Link with all dependencies (console + GUI)
 if(APPLE)
-    target_link_libraries(moneybot_gui PRIVATE
+    target_link_libraries(moneybot
         ${Boost_LIBRARIES}
         ${CURL_LIBRARIES}
         ${OPENSSL_LIBRARIES}
@@ -151,7 +121,7 @@ if(APPLE)
         "/opt/homebrew/lib/libglfw.dylib"
     )
 else()
-    target_link_libraries(moneybot_gui PRIVATE
+    target_link_libraries(moneybot
         ${Boost_LIBRARIES}
         ${CURL_LIBRARIES}
         ${OPENSSL_LIBRARIES}
@@ -162,10 +132,12 @@ else()
     )
 endif()
 
-install(FILES include/dummy_strategy.h DESTINATION include)
-
-add_custom_command(TARGET moneybot_gui POST_BUILD
+add_custom_command(TARGET moneybot POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/logs
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/data
     COMMAND ${CMAKE_COMMAND} -E copy
             ${CMAKE_SOURCE_DIR}/config.json
             ${CMAKE_BINARY_DIR}/config.json
 )
+
+install(FILES include/dummy_strategy.h DESTINATION include)

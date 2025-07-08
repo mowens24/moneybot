@@ -55,23 +55,7 @@ Moneybot is a high-performance, modular cryptocurrency trading bot written in C+
 
 ### Build Instructions
 
-#### Console Application
-```sh
-mkdir build
-cd build
-cmake ..
-make moneybot
-```
-
-#### GUI Application
-```sh
-mkdir build
-cd build
-cmake ..
-make moneybot_gui
-```
-
-#### Build Both Targets
+#### Combined Application (Console + GUI)
 ```sh
 mkdir build
 cd build
@@ -92,28 +76,31 @@ Edit `config.json` to set exchange endpoints, API keys, and strategy parameters.
 
 ### Running MoneyBot
 
-#### Standard Trading Mode
+#### Console Mode (Default)
 ```sh
 ./build/moneybot
 ```
 
-#### Backtesting Mode
-Run historical simulations with your strategy and data:
+#### GUI Dashboard Mode
 ```sh
-./build/moneybot --backtest [ticks.db]
+./build/moneybot --gui
+# or
+./build/moneybot -g
 ```
-If no file is given, defaults to `data/ticks.db`.
 
-#### Analysis Mode
-Analyze historical data (spread, VWAP, tick count):
+#### Other Options
 ```sh
+# Analysis mode
 ./build/moneybot --analyze
-```
 
-#### Dry-Run Mode
-Simulate live trading without placing real orders:
-```sh
+# Backtesting mode
+./build/moneybot --backtest [ticks.db]
+
+# Dry-run mode
 ./build/moneybot --dry-run
+
+# Help
+./build/moneybot --help
 ```
 
 #### With Docker
@@ -124,7 +111,7 @@ docker-compose up
 
 ## Advanced GUI Dashboard
 
-MoneyBot features a modern, modular dashboard built with Dear ImGui, providing real-time visualization of trading data and system metrics.
+MoneyBot features a modern, modular dashboard built with Dear ImGui, accessible via command line flags for seamless integration with console operations.
 
 ### Dashboard Features
 
@@ -132,51 +119,52 @@ MoneyBot features a modern, modular dashboard built with Dear ImGui, providing r
 - **Order Book Widget**: Real-time bid/ask visualization with color-coded price levels
 - **Modular Architecture**: Clean separation of dashboard components for maintainability
 - **Real-time Updates**: Live data streaming from the trading engine
+- **Integrated Design**: Single executable with both console and GUI modes
 
 ### GUI Architecture
 
-The dashboard is built using modular widgets:
+The dashboard is built using modular widgets within a unified application:
 
 - `dashboard_metrics_widget.h/cpp`: Trading metrics and performance display
 - `dashboard_orderbook_widget.h/cpp`: Order book visualization
-- `gui_main.cpp`: Main GUI loop and window management
+- `gui_main.cpp`: GUI mode implementation (called via `--gui` flag)
+- `main.cpp`: Unified entry point with mode detection
 
-### Building and Running the GUI
+### Usage
 
-#### Prerequisites (macOS)
+#### GUI Mode
+```sh
+# Launch GUI dashboard
+./build/moneybot --gui
+./build/moneybot -g
+```
+
+#### Console Mode (Default)
+```sh
+# Standard console operation
+./build/moneybot
+./build/moneybot --analyze
+./build/moneybot --backtest
+./build/moneybot --dry-run
+```
+
+### Prerequisites (for GUI mode)
+
+#### macOS
 ```sh
 # Install GLFW via Homebrew
 brew install glfw
 
-# Ensure ImGui is available (already included in lib/imgui)
+# ImGui is included in lib/imgui (no additional installation needed)
 ```
 
-#### Build and Run
-```sh
-# Build the GUI application
-cmake -S . -B build
-cmake --build build --target moneybot_gui
+### Configuration Notes
 
-# Run the dashboard
-./build/moneybot_gui
-```
-
-### Running CLI and GUI Together
-Start each in a separate terminal for full functionality:
-```sh
-# Terminal 1: Start the trading engine
-./build/moneybot
-
-# Terminal 2: Start the GUI dashboard
-./build/moneybot_gui
-```
-
-### macOS Configuration Notes
-
-- Uses OpenGL 3.3 Core Profile with GLSL 330 for optimal performance
-- Automatically silences OpenGL deprecation warnings
-- Configured for Apple Silicon (ARM64) and Intel compatibility
-- Uses absolute config paths for reliable operation
+- **Single executable**: Both console and GUI modes in one binary
+- **Command-line driven**: No separate GUI executable to manage  
+- **Shared configuration**: Both modes use the same `config.json`
+- **macOS optimized**: Uses OpenGL 3.3 Core Profile with GLSL 330
+- **Cross-platform**: Supports both Apple Silicon (ARM64) and Intel architectures
 
 
 ## Backtesting & Strategy Development
