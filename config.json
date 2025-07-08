@@ -3,12 +3,17 @@
         "symbol": "BTCUSDT",
         "type": "market_maker",
         "config": {
-            "spread_bps": 5.0,
+            "base_spread_bps": 10.0,
+            "max_spread_bps": 100.0,
+            "min_spread_bps": 2.0,
             "order_size": 0.001,
             "max_position": 0.01,
+            "inventory_skew_factor": 3.0,
+            "volatility_window": 100,
+            "volatility_multiplier": 2.0,
+            "refresh_interval_ms": 2000,
+            "min_profit_bps": 1.0,
             "rebalance_threshold": 0.005,
-            "refresh_interval_ms": 1000,
-            "min_spread_bps": 2.0,
             "max_slippage_bps": 10.0,
             "aggressive_rebalancing": false
         }

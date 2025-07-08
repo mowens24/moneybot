@@ -1,0 +1,5 @@
+{"timestamp": 1640995200000, "symbol": "BTCUSDT", "price": 50000.0, "quantity": 0.1, "side": "buy"}
+{"timestamp": 1640995201000, "symbol": "BTCUSDT", "price": 50001.0, "quantity": 0.05, "side": "sell"}
+{"timestamp": 1640995202000, "symbol": "BTCUSDT", "price": 50002.0, "quantity": 0.2, "side": "buy"}
+{"timestamp": 1640995203000, "symbol": "BTCUSDT", "price": 49999.0, "quantity": 0.15, "side": "sell"}
+{"timestamp": 1640995204000, "symbol": "BTCUSDT", "price": 50003.0, "quantity": 0.08, "side": "buy"}

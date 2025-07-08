@@ -24,25 +24,35 @@ BacktestResult BacktestEngine::run(const std::string& symbol, const std::string&
         if (logger_) logger_->getLogger()->error("Failed to open backtest data: {}", data_path);
         return result;
     }
-    nlohmann::json tick;
+    
+    std::string line;
     double equity = 0.0;
     double peak = 0.0;
     double trough = 0.0;
     std::vector<double> returns;
     OrderBook ob(logger_); // Create order book once, pass logger
-    while (file >> tick) {
-        // Simulate order book update
-        ob.update(tick);
-        if (strategy_) strategy_->onOrderBookUpdate(ob);
-        // Simulate a trade for demonstration
-        result.total_trades++;
-        // For now, just collect equity curve
-        result.equity_curve.push_back(equity);
-        if (equity > peak) peak = equity;
-        if (equity < trough) trough = equity;
-        double dd = (peak > 0) ? (peak - equity) / peak : 0.0;
-        if (dd > result.max_drawdown) result.max_drawdown = dd;
+    
+    while (std::getline(file, line)) {
+        if (line.empty()) continue;
+        
+        try {
+            nlohmann::json tick = nlohmann::json::parse(line);
+            // Simulate order book update
+            ob.update(tick);
+            if (strategy_) strategy_->onOrderBookUpdate(ob);
+            // Simulate a trade for demonstration
+            result.total_trades++;
+            // For now, just collect equity curve
+            result.equity_curve.push_back(equity);
+            if (equity > peak) peak = equity;
+            if (equity < trough) trough = equity;
+            double dd = (peak > 0) ? (peak - equity) / peak : 0.0;
+            if (dd > result.max_drawdown) result.max_drawdown = dd;
+        } catch (const std::exception& e) {
+            if (logger_) logger_->getLogger()->warn("Failed to parse line: {}", line);
+        }
     }
+    
     // Compute Sharpe ratio (placeholder)
     if (!returns.empty()) {
         double mean = 0.0, stddev = 0.0;
