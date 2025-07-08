@@ -19,6 +19,9 @@ namespace moneybot {
         double getBestAsk() const;
         void flushBatch();
         void pruneOldData(int64_t max_age_ms);
+        // Expose top N bids/asks for GUI
+        std::vector<std::pair<double, double>> getTopBids(size_t n = 10) const;
+        std::vector<std::pair<double, double>> getTopAsks(size_t n = 10) const;
     private:
         struct Tick {
             int64_t timestamp;

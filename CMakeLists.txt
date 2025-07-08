@@ -1,4 +1,3 @@
-
 # --- Force Apple Clang on macOS ---
 
 # --- Force Apple Clang and set PTY include path on macOS ---
@@ -33,6 +32,10 @@ if(APPLE)
     else()
         message(WARNING "Could not determine macOS SDK path for sysroot!")
     endif()
+
+    # On macOS, we need to link against the frameworks
+    link_directories(/System/Library/Frameworks)
+    link_directories(/usr/local/lib)
 endif()
 
 cmake_minimum_required(VERSION 3.10)
@@ -96,11 +99,6 @@ add_custom_command(TARGET moneybot POST_BUILD
 # You must download ImGui to lib/imgui and GLFW to your system or as a submodule.
 # This block assumes pkg-config for GLFW3 and OpenGL is available.
 
-
-# --- ImGui/GLFW/OpenGL3 GUI build ---
-# You must download ImGui to lib/imgui and GLFW to your system or as a submodule.
-# This block assumes pkg-config for GLFW3 and OpenGL is available.
-
 add_executable(moneybot_gui
     src/gui_main.cpp
     src/moneybot.cpp
@@ -111,46 +109,63 @@ add_executable(moneybot_gui
     src/risk_manager.cpp
     src/market_maker_strategy.cpp
     src/order_manager.cpp
+    src/dashboard_metrics_widget.cpp
+    src/dashboard_orderbook_widget.cpp
+    # ImGui core files
+    lib/imgui/imgui.cpp
+    lib/imgui/imgui_demo.cpp
+    lib/imgui/imgui_draw.cpp
+    lib/imgui/imgui_tables.cpp
+    lib/imgui/imgui_widgets.cpp
+    # ImGui backends for GLFW and OpenGL3
+    lib/imgui/backends/imgui_impl_glfw.cpp
+    lib/imgui/backends/imgui_impl_opengl3.cpp
 )
 
 # --- Workaround for missing pty.h on macOS ---
 if(APPLE)
     # Always add our local compat header for pty.h
     target_include_directories(moneybot_gui PRIVATE ${CMAKE_SOURCE_DIR}/include/compat)
+    # Silence OpenGL deprecation warnings on macOS
+    target_compile_definitions(moneybot_gui PRIVATE GL_SILENCE_DEPRECATION)
     message(STATUS "Added ${CMAKE_SOURCE_DIR}/include/compat to moneybot_gui for pty.h workaround")
 endif()
-
-# ImGui backend sources for OpenGL3+GLFW
-set(IMGUI_BACKEND_SRC
-    lib/imgui/imgui.cpp
-    lib/imgui/imgui_draw.cpp
-    lib/imgui/imgui_tables.cpp
-    lib/imgui/imgui_widgets.cpp
-    lib/imgui/imgui_demo.cpp
-    lib/imgui/backends/imgui_impl_glfw.cpp
-    lib/imgui/backends/imgui_impl_opengl3.cpp
-)
-target_sources(moneybot_gui PRIVATE ${IMGUI_BACKEND_SRC})
 
 # Explicitly add Homebrew's lib path for GLFW
 link_directories(/opt/homebrew/lib)
 
-
-
-
 # Link with GLFW and other dependencies
 # Try both the variable and the direct path for robustness
 # (If you have a different version, adjust the .dylib name accordingly)
-target_link_libraries(moneybot_gui
-    /opt/homebrew/lib/libglfw.dylib
-    OpenGL::GL
-    pthread
-    sqlite3
-    ${Boost_LIBRARIES}
-    ${CURL_LIBRARIES}
-    ${OPENSSL_LIBRARIES}
-    ${SQLite3_LIBRARIES}
-    spdlog::spdlog
-)
+if(APPLE)
+    target_link_libraries(moneybot_gui PRIVATE
+        ${Boost_LIBRARIES}
+        ${CURL_LIBRARIES}
+        ${OPENSSL_LIBRARIES}
+        ${SQLite3_LIBRARIES}
+        spdlog::spdlog
+        "-framework OpenGL"
+        "-framework Cocoa"
+        "-framework IOKit"
+        "-framework CoreVideo"
+        "/opt/homebrew/lib/libglfw.dylib"
+    )
+else()
+    target_link_libraries(moneybot_gui PRIVATE
+        ${Boost_LIBRARIES}
+        ${CURL_LIBRARIES}
+        ${OPENSSL_LIBRARIES}
+        ${SQLite3_LIBRARIES}
+        spdlog::spdlog
+        ${OPENGL_LIBRARIES}
+        ${GLFW_LIBRARIES}
+    )
+endif()
 
 install(FILES include/dummy_strategy.h DESTINATION include)
+
+add_custom_command(TARGET moneybot_gui POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+            ${CMAKE_SOURCE_DIR}/config.json
+            ${CMAKE_BINARY_DIR}/config.json
+)

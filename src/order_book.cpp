@@ -2,6 +2,26 @@
 #include <chrono>
 
 namespace moneybot {
+
+    std::vector<std::pair<double, double>> OrderBook::getTopBids(size_t n) const {
+        std::vector<std::pair<double, double>> result;
+        size_t count = 0;
+        for (const auto& kv : bids_) {
+            if (count++ >= n) break;
+            result.push_back(kv);
+        }
+        return result;
+    }
+
+    std::vector<std::pair<double, double>> OrderBook::getTopAsks(size_t n) const {
+        std::vector<std::pair<double, double>> result;
+        size_t count = 0;
+        for (const auto& kv : asks_) {
+            if (count++ >= n) break;
+            result.push_back(kv);
+        }
+        return result;
+    }
     OrderBook::OrderBook(std::shared_ptr<Logger> logger) : logger_(logger) {
         openDatabase();
         initializeSchema();

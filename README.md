@@ -8,6 +8,7 @@ Moneybot is a high-performance, modular cryptocurrency trading bot written in C+
 - **WebSocket Connectivity**: Asynchronous, SSL-secured WebSocket connections to crypto exchanges using Boost.Asio and Boost.Beast.
 - **Order Book Management**: Real-time order book updates and trade processing.
 - **Strategy Support**: Pluggable strategy interface for implementing custom trading logic (e.g., market making).
+- **Advanced GUI Dashboard**: Modular ImGui-based interface with real-time metrics and order book visualization.
 - **Robust Logging**: Integrated logging using spdlog for debugging and monitoring.
 - **Configurable**: JSON-based configuration for exchange endpoints, credentials, and strategy parameters.
 - **Docker Support**: Dockerfile and compose files for easy deployment and development.
@@ -37,6 +38,7 @@ Moneybot is a high-performance, modular cryptocurrency trading bot written in C+
 - **Logger**: Centralized logging facility.
 - **RiskManager**: Monitors and enforces trading risk limits.
 - **OrderManager**: Handles order placement, tracking, and execution reports.
+- **GUI Dashboard**: Modular ImGui-based interface with separate widgets for metrics and order book visualization.
 
 ## Getting Started
 
@@ -48,9 +50,28 @@ Moneybot is a high-performance, modular cryptocurrency trading bot written in C+
 - OpenSSL
 - spdlog
 - nlohmann/json
+- GLFW3 (for GUI)
+- OpenGL (for GUI)
 
 ### Build Instructions
 
+#### Console Application
+```sh
+mkdir build
+cd build
+cmake ..
+make moneybot
+```
+
+#### GUI Application
+```sh
+mkdir build
+cd build
+cmake ..
+make moneybot_gui
+```
+
+#### Build Both Targets
 ```sh
 mkdir build
 cd build
@@ -101,35 +122,61 @@ docker-compose up
 ```
 
 
-## Graphical Dashboard (ImGui GUI)
+## Advanced GUI Dashboard
 
-MoneyBot includes a real-time dashboard built with Dear ImGui. The GUI displays live trading stats, order book, and connection status.
+MoneyBot features a modern, modular dashboard built with Dear ImGui, providing real-time visualization of trading data and system metrics.
+
+### Dashboard Features
+
+- **Metrics Widget**: Displays trading performance, P&L, active orders, and market statistics
+- **Order Book Widget**: Real-time bid/ask visualization with color-coded price levels
+- **Modular Architecture**: Clean separation of dashboard components for maintainability
+- **Real-time Updates**: Live data streaming from the trading engine
+
+### GUI Architecture
+
+The dashboard is built using modular widgets:
+
+- `dashboard_metrics_widget.h/cpp`: Trading metrics and performance display
+- `dashboard_orderbook_widget.h/cpp`: Order book visualization
+- `gui_main.cpp`: Main GUI loop and window management
 
 ### Building and Running the GUI
+
+#### Prerequisites (macOS)
 ```sh
+# Install GLFW via Homebrew
+brew install glfw
+
+# Ensure ImGui is available (already included in lib/imgui)
+```
+
+#### Build and Run
+```sh
+# Build the GUI application
 cmake -S . -B build
-cmake --build build
+cmake --build build --target moneybot_gui
+
+# Run the dashboard
 ./build/moneybot_gui
 ```
 
 ### Running CLI and GUI Together
-Start each in a separate terminal:
+Start each in a separate terminal for full functionality:
 ```sh
+# Terminal 1: Start the trading engine
 ./build/moneybot
-# In another terminal:
+
+# Terminal 2: Start the GUI dashboard
 ./build/moneybot_gui
 ```
 
-#### macOS OpenGL/GLSL Troubleshooting
+### macOS Configuration Notes
 
-- The GUI is configured to use OpenGL 2.1 and GLSL 120 for maximum compatibility on macOS.
-- If you see shader errors, ensure you have the correct GLSL version in `src/gui_main.cpp`:
-  ```cpp
-  const char* glsl_version = "#version 120";
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
-  ```
-- Make sure you have installed GLFW via Homebrew and that `/opt/homebrew/lib` is in your library path.
+- Uses OpenGL 3.3 Core Profile with GLSL 330 for optimal performance
+- Automatically silences OpenGL deprecation warnings
+- Configured for Apple Silicon (ARM64) and Intel compatibility
+- Uses absolute config paths for reliable operation
 
 
 ## Backtesting & Strategy Development

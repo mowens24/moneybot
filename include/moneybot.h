@@ -47,6 +47,16 @@ namespace moneybot {
             if (order_book_) return order_book_->getBestAsk();
             return 0.0;
         }
+
+        // Expose top N bids/asks for GUI
+        std::vector<std::pair<double, double>> getTopBids(size_t n = 10) const {
+            if (order_book_) return order_book_->getTopBids(n);
+            return {};
+        }
+        std::vector<std::pair<double, double>> getTopAsks(size_t n = 10) const {
+            if (order_book_) return order_book_->getTopAsks(n);
+            return {};
+        }
         std::string getLastEvent() const { return last_event_; }
         void setLastEvent(const std::string& evt) { last_event_ = evt; }
         bool isWsConnected() const { return ws_connected_; }
