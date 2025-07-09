@@ -18,6 +18,7 @@ struct ExchangeConfig {
     std::string ws_url;
     std::string api_key;
     std::string secret_key;
+    std::string passphrase; // For exchanges like Coinbase that require a passphrase
     double taker_fee = 0.001;
     double maker_fee = 0.001;
     bool enabled = true;

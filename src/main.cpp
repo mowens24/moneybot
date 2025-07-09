@@ -3,11 +3,14 @@
 #include "data_analyzer.h"
 #include "backtest_engine.h"
 #include "strategy_factory.h"
+#include "config_manager.h"
+#include "market_data_simulator.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <iostream>
 #include <signal.h>
 #include <atomic>
+#include <iomanip>
 
 using json = nlohmann::json;
 
@@ -79,24 +82,25 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    // Load configuration
-    std::ifstream config_stream(config_file);
-    if (!config_stream.is_open()) {
-        std::cerr << "Error: Could not open config file: " << config_file << std::endl;
+    // Initialize configuration manager
+    auto& config_manager = moneybot::ConfigManager::getInstance();
+    if (!config_manager.loadConfig(config_file)) {
+        std::cerr << "Error: Failed to load configuration from: " << config_file << std::endl;
         return 1;
     }
 
-    json config;
-    try {
-        config_stream >> config;
-    } catch (const std::exception& e) {
-        std::cerr << "Error: Invalid JSON in config file: " << e.what() << std::endl;
+    json config = config_manager.getConfig();
+
+    // Validate API keys if not in dry-run mode
+    if (!config_manager.isDryRunMode() && !config_manager.validateApiKeys()) {
+        std::cerr << "Error: Invalid or missing API keys. Check environment variables." << std::endl;
+        std::cerr << "Run './setup_env.sh' to set up API keys, then 'source load_env.sh'" << std::endl;
         return 1;
     }
 
-    // Set dry-run mode if requested
+    // Set dry-run mode if requested via command line
     if (dry_run) {
-        config["exchange"]["rest_api"]["api_key"] = "dry_run_mode";
+        config["dry_run"] = true;
         config["exchange"]["rest_api"]["secret_key"] = "dry_run_mode";
         std::cout << "Running in DRY-RUN mode (no real orders will be placed)" << std::endl;
     }
@@ -162,6 +166,46 @@ int main(int argc, char* argv[]) {
     std::cout << "Press Ctrl+C to stop" << std::endl;
 
     try {
+        // Initialize market data simulator for demo/testing
+        std::unique_ptr<moneybot::MarketDataSimulator> simulator;
+        if (config_manager.isDryRunMode()) {
+            std::cout << "🎯 Initializing Market Data Simulator (Demo Mode)" << std::endl;
+            simulator = std::make_unique<moneybot::MarketDataSimulator>();
+            
+            // Configure simulation parameters
+            simulator->setVolatility(0.02); // 2% daily volatility
+            simulator->setTrendDirection(0.1); // Slight upward trend
+            simulator->setUpdateInterval(std::chrono::milliseconds(100)); // 10 updates per second
+            
+            // Set up callbacks for live data display
+            simulator->setTickCallback([](const moneybot::MarketDataTick& tick) {
+                // Optional: Log every N-th tick to avoid spam
+                static int tick_counter = 0;
+                if (++tick_counter % 50 == 0) { // Log every 5 seconds at 100ms intervals
+                    std::cout << "📊 " << tick.exchange << " " << tick.symbol 
+                              << " | Bid: $" << std::fixed << std::setprecision(2) << tick.bid_price
+                              << " | Ask: $" << tick.ask_price 
+                              << " | Spread: " << std::setprecision(4) << ((tick.ask_price - tick.bid_price) / tick.bid_price * 10000) << " bps"
+                              << std::endl;
+                }
+            });
+            
+            simulator->start();
+            
+            // Simulate some market events
+            std::thread([&simulator]() {
+                std::this_thread::sleep_for(std::chrono::seconds(30));
+                if (simulator && simulator->isRunning()) {
+                    simulator->simulateNewsEvent(2.5, std::chrono::seconds(60)); // 2.5% positive news
+                }
+                
+                std::this_thread::sleep_for(std::chrono::seconds(120));
+                if (simulator && simulator->isRunning()) {
+                    simulator->simulateNewsEvent(-1.8, std::chrono::seconds(45)); // -1.8% negative news
+                }
+            }).detach();
+        }
+
         moneybot::TradingEngine engine(config);
         engine.start();
         
@@ -200,9 +244,26 @@ int main(int argc, char* argv[]) {
                 std::cout << "Emergency Stop: " << (risk["emergency_stopped"].get<bool>() ? "Yes" : "No") << std::endl;
                 std::cout << "Drawdown: " << std::fixed << std::setprecision(2) << risk["drawdown"].get<double>() << "%" << std::endl;
             }
+            
+            // Show live market data if simulator is running
+            if (simulator && simulator->isRunning()) {
+                auto btc_tick = simulator->getLatestTick("BTCUSDT", "binance");
+                if (!btc_tick.symbol.empty()) {
+                    std::cout << "📈 Live Market: " << btc_tick.symbol 
+                              << " $" << std::fixed << std::setprecision(2) << btc_tick.last_price
+                              << " (24h Vol: $" << std::setprecision(0) << btc_tick.volume_24h << ")" << std::endl;
+                }
+            }
+            
             std::cout << "---" << std::endl;
         }
         std::cout << "\nShutting down..." << std::endl;
+        
+        // Stop simulator first
+        if (simulator) {
+            simulator->stop();
+        }
+        
         engine.stop();
         
         // Final status report

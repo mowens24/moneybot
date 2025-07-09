@@ -1,4 +1,5 @@
 #include "exchange_connectors.h"
+#include "config_manager.h"
 #include <chrono>
 #include <sstream>
 

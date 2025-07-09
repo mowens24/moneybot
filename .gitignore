@@ -8,3 +8,8 @@ Dockerfile*
 logs/
 lib/spdlog/.git
 lib/json/.git
+
+# Environment files (NEVER commit these)
+.env
+.env.local
+.env.production

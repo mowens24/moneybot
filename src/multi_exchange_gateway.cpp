@@ -1,5 +1,6 @@
 #include "multi_exchange_gateway.h"
 #include "exchange_connectors.h"
+#include "config_manager.h"
 #include <algorithm>
 #include <thread>
 #include <chrono>
@@ -527,18 +528,55 @@ void MultiExchangeGateway::logError(const std::string& message) const {
     }
 }
 
-// Placeholder implementation for exchange connector factory
+// Exchange connector factory with proper API key injection
 std::unique_ptr<ExchangeConnector> createExchangeConnector(const ExchangeConfig& config, 
                                                            std::shared_ptr<Logger> logger) {
     std::string exchange_name = config.name;
     std::transform(exchange_name.begin(), exchange_name.end(), exchange_name.begin(), ::tolower);
     
+    // Get updated config with environment variable API keys
+    auto& config_manager = ConfigManager::getInstance();
+    nlohmann::json exchange_config = config_manager.getExchangeConfig(exchange_name);
+    
+    if (exchange_config.empty()) {
+        logger->getLogger()->error("No configuration found for exchange: {}", config.name);
+        return nullptr;
+    }
+    
+    // Create ExchangeConfig with resolved API keys
+    ExchangeConfig updated_config = config;
+    
+    if (exchange_config.contains("api_key")) {
+        updated_config.api_key = exchange_config["api_key"];
+    }
+    if (exchange_config.contains("secret_key")) {
+        updated_config.secret_key = exchange_config["secret_key"];
+    }
+    if (exchange_config.contains("passphrase")) {
+        updated_config.passphrase = exchange_config["passphrase"];
+    }
+    
+    // Validate API keys for production mode
+    if (!config_manager.isDryRunMode()) {
+        if (updated_config.api_key.empty() || updated_config.secret_key.empty()) {
+            logger->getLogger()->error("Missing API keys for exchange: {}. Set environment variables.", config.name);
+            return nullptr;
+        }
+        
+        // Check for placeholder values
+        if (updated_config.api_key.find("your_") != std::string::npos || 
+            updated_config.secret_key.find("your_") != std::string::npos) {
+            logger->getLogger()->error("Placeholder API keys detected for exchange: {}. Update environment variables.", config.name);
+            return nullptr;
+        }
+    }
+    
     if (exchange_name == "binance") {
-        return std::make_unique<BinanceConnector>(config, logger);
+        return std::make_unique<BinanceConnector>(updated_config, logger);
     } else if (exchange_name == "coinbase") {
-        return std::make_unique<CoinbaseConnector>(config, logger);
+        return std::make_unique<CoinbaseConnector>(updated_config, logger);
     } else if (exchange_name == "kraken") {
-        return std::make_unique<KrakenConnector>(config, logger);
+        return std::make_unique<KrakenConnector>(updated_config, logger);
     } else {
         logger->getLogger()->warn("Unknown exchange: {}. Using base connector.", config.name);
         // For unknown exchanges, we could return a generic base connector
