@@ -81,6 +81,8 @@ add_executable(moneybot
     src/order_manager.cpp
     src/backtest_engine.cpp
     src/strategy_factory.cpp
+    src/multi_exchange_gateway.cpp
+    src/exchange_connectors.cpp
     src/dashboard_metrics_widget.cpp
     src/dashboard_orderbook_widget.cpp
     # ImGui core files

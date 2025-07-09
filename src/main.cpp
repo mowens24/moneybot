@@ -30,6 +30,7 @@ void printUsage(const char* program) {
               << "  --help        Show this help message\n"
               << "  --dry-run     Run without placing real orders\n"
               << "  --backtest    Run in backtest mode with historical data\n"
+              << "  --multi-asset Run multi-asset trading mode\n"
               << std::endl;
 }
 
@@ -41,6 +42,7 @@ int main(int argc, char* argv[]) {
     bool analyze_mode = false;
     bool dry_run = false;
     bool backtest_mode = false;
+    bool multi_asset_mode = false;
     std::string backtest_data = "data/ticks.db";
 
     // Parse command line arguments
@@ -68,6 +70,8 @@ int main(int argc, char* argv[]) {
             if (i + 1 < argc && argv[i+1][0] != '-') {
                 backtest_data = argv[++i];
             }
+        } else if (arg == "--multi-asset") {
+            multi_asset_mode = true;
         } else {
             std::cerr << "Unknown option: " << arg << std::endl;
             printUsage(argv[0]);
@@ -127,9 +131,34 @@ int main(int argc, char* argv[]) {
     }
 
     std::cout << "=== MoneyBot HFT Trading System ===" << std::endl;
-    std::cout << "Strategy: " << config["strategy"]["type"].get<std::string>() << std::endl;
-    std::cout << "Symbol: " << config["strategy"]["symbol"].get<std::string>() << std::endl;
-    std::cout << "Exchange: " << config["exchange"]["rest_api"]["base_url"].get<std::string>() << std::endl;
+    
+    if (multi_asset_mode || config["strategy"]["type"].get<std::string>() == "multi_asset") {
+        std::cout << "🚀 MULTI-ASSET TRADING MODE" << std::endl;
+        std::cout << "Strategy: Multi-Asset Goldman Sachs Level" << std::endl;
+        std::cout << "Exchanges: ";
+        if (config.contains("multi_asset") && config["multi_asset"].contains("exchanges")) {
+            for (const auto& exchange : config["multi_asset"]["exchanges"]) {
+                if (exchange["enabled"].get<bool>()) {
+                    std::cout << exchange["name"].get<std::string>() << " ";
+                }
+            }
+        }
+        std::cout << std::endl;
+        std::cout << "Strategies: ";
+        if (config.contains("strategies")) {
+            for (const auto& [strategy_name, strategy_config] : config["strategies"].items()) {
+                if (strategy_config["enabled"].get<bool>()) {
+                    std::cout << strategy_name << " ";
+                }
+            }
+        }
+        std::cout << std::endl;
+    } else {
+        std::cout << "Strategy: " << config["strategy"]["type"].get<std::string>() << std::endl;
+        std::cout << "Symbol: " << config["strategy"]["symbol"].get<std::string>() << std::endl;
+        std::cout << "Exchange: " << config["exchange"]["rest_api"]["base_url"].get<std::string>() << std::endl;
+    }
+    
     std::cout << "Press Ctrl+C to stop" << std::endl;
 
     try {

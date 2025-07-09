@@ -30,6 +30,11 @@ void TradingEngine::initializeComponents() {
     std::string strategy_type = config_["strategy"]["type"].get<std::string>();
     if (strategy_type == "market_maker") {
         strategy_ = std::make_shared<MarketMakerStrategy>(logger_, order_manager_, risk_manager_, config_);
+    } else if (strategy_type == "multi_asset") {
+        // For multi-asset mode, use a dummy strategy for now
+        // In the future, this will create a Multi-Asset Strategy Manager
+        strategy_ = std::make_shared<MarketMakerStrategy>(logger_, order_manager_, risk_manager_, config_);
+        logger_->getLogger()->info("Multi-asset strategy mode initialized (using market maker for now)");
     } else {
         throw std::runtime_error("Unknown strategy type: " + strategy_type);
     }

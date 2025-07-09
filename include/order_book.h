@@ -17,6 +17,8 @@ namespace moneybot {
         std::pair<double, double> getBestBidAsk() const;
         double getBestBid() const;
         double getBestAsk() const;
+        double getBestBidSize() const;
+        double getBestAskSize() const;
         void flushBatch();
         void pruneOldData(int64_t max_age_ms);
         // Expose top N bids/asks for GUI

@@ -1,7 +1,7 @@
 {
     "strategy": {
         "symbol": "BTCUSDT",
-        "type": "market_maker",
+        "type": "multi_asset",
         "config": {
             "base_spread_bps": 10.0,
             "max_spread_bps": 100.0,
@@ -16,6 +16,106 @@
             "rebalance_threshold": 0.005,
             "max_slippage_bps": 10.0,
             "aggressive_rebalancing": false
+        }
+    },
+    "multi_asset": {
+        "enabled": true,
+        "exchanges": [
+            {
+                "name": "binance",
+                "rest_url": "https://api.binance.us",
+                "ws_url": "wss://stream.binance.us:9443/ws",
+                "api_key": "your_binance_key",
+                "secret_key": "your_binance_secret",
+                "taker_fee": 0.001,
+                "maker_fee": 0.001,
+                "enabled": true,
+                "max_connections": 5,
+                "latency_threshold_ms": 100.0
+            },
+            {
+                "name": "coinbase",
+                "rest_url": "https://api.exchange.coinbase.com",
+                "ws_url": "wss://ws-feed.exchange.coinbase.com",
+                "api_key": "your_coinbase_key",
+                "secret_key": "your_coinbase_secret",
+                "taker_fee": 0.005,
+                "maker_fee": 0.005,
+                "enabled": false,
+                "max_connections": 3,
+                "latency_threshold_ms": 150.0
+            },
+            {
+                "name": "kraken",
+                "rest_url": "https://api.kraken.com",
+                "ws_url": "wss://ws.kraken.com",
+                "api_key": "your_kraken_key",
+                "secret_key": "your_kraken_secret",
+                "taker_fee": 0.0026,
+                "maker_fee": 0.0016,
+                "enabled": false,
+                "max_connections": 3,
+                "latency_threshold_ms": 200.0
+            }
+        ]
+    },
+    "strategies": {
+        "statistical_arbitrage": {
+            "enabled": true,
+            "pairs": [
+                {
+                    "base_symbol": "BTCUSDT",
+                    "hedge_symbol": "ETHUSDT",
+                    "hedge_ratio": 0.065
+                },
+                {
+                    "base_symbol": "ETHUSDT", 
+                    "hedge_symbol": "ADAUSDT",
+                    "hedge_ratio": 2.5
+                },
+                {
+                    "base_symbol": "BTCUSDT",
+                    "hedge_symbol": "LINKUSDT", 
+                    "hedge_ratio": 0.03
+                }
+            ],
+            "entry_threshold": 2.0,
+            "exit_threshold": 0.5,
+            "stop_loss_threshold": 4.0,
+            "lookback_periods": 200,
+            "max_position_size": 0.01,
+            "rebalance_frequency_ms": 5000,
+            "correlation_threshold": 0.7,
+            "min_half_life_minutes": 30.0,
+            "max_half_life_minutes": 1440.0,
+            "transaction_cost_bps": 10.0,
+            "use_kalman_filter": true,
+            "volatility_threshold": 0.05
+        },
+        "cross_exchange_arbitrage": {
+            "enabled": true,
+            "min_profit_bps": 20.0,
+            "max_position_size": 0.01,
+            "max_latency_ms": 100.0,
+            "symbols": ["BTCUSDT", "ETHUSDT", "ADAUSDT", "DOTUSDT", "LINKUSDT"],
+            "include_fees": true,
+            "slippage_buffer_bps": 5.0
+        },
+        "portfolio_optimization": {
+            "enabled": true,
+            "total_capital": 10000.0,
+            "rebalance_threshold": 0.05,
+            "rebalance_frequency_hours": 24,
+            "transaction_cost_bps": 10.0,
+            "target_weights": {
+                "BTCUSDT": 0.40,
+                "ETHUSDT": 0.30,
+                "ADAUSDT": 0.10,
+                "DOTUSDT": 0.10,
+                "LINKUSDT": 0.10
+            },
+            "max_single_asset_weight": 0.50,
+            "cash_buffer_percent": 0.05
         }
     },
     "exchange": {
