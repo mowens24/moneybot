@@ -87,6 +87,7 @@ add_executable(moneybot
     src/market_data_simulator.cpp
     src/dashboard_metrics_widget.cpp
     src/dashboard_orderbook_widget.cpp
+    src/advanced_orderbook_widget.cpp
     # ImGui core files
     lib/imgui/imgui.cpp
     lib/imgui/imgui_demo.cpp
