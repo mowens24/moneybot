@@ -27,11 +27,12 @@ void signalHandler(int signum) {
 void printUsage(const char* program) {
     std::cout << "Usage: " << program << " [OPTIONS]\n"
               << "Options:\n"
-              << "  --gui, -g     Launch GUI dashboard mode\n"
+              << "  --console, -c Launch in console mode (GUI is default)\n"
+              << "  --simulator, -s Use market data simulator (live data is default)\n"
               << "  --analyze     Run in analysis mode (no trading)\n"
               << "  --config FILE Use custom config file (default: config.json)\n"
               << "  --help        Show this help message\n"
-              << "  --dry-run     Run without placing real orders\n"
+              << "  --dry-run     Run without placing real orders (implies --simulator)\n"
               << "  --backtest    Run in backtest mode with historical data\n"
               << "  --multi-asset Run multi-asset trading mode\n"
               << std::endl;
@@ -46,6 +47,8 @@ int main(int argc, char* argv[]) {
     bool dry_run = false;
     bool backtest_mode = false;
     bool multi_asset_mode = false;
+    bool console_mode = false;  // Changed: GUI is now default
+    bool use_simulator = false; // Changed: Live data is now default
     std::string backtest_data = "data/ticks.db";
 
     // Parse command line arguments
@@ -54,9 +57,10 @@ int main(int argc, char* argv[]) {
         if (arg == "--help" || arg == "-h") {
             printUsage(argv[0]);
             return 0;
-        } else if (arg == "--gui" || arg == "-g") {
-            std::cout << "Starting MoneyBot GUI mode..." << std::endl;
-            return gui_main(argc, argv);
+        } else if (arg == "--console" || arg == "-c") {
+            console_mode = true;
+        } else if (arg == "--simulator" || arg == "-s") {
+            use_simulator = true;
         } else if (arg == "--analyze") {
             analyze_mode = true;
         } else if (arg == "--config") {
@@ -68,6 +72,7 @@ int main(int argc, char* argv[]) {
             }
         } else if (arg == "--dry-run") {
             dry_run = true;
+            use_simulator = true; // Dry run implies simulator
         } else if (arg == "--backtest") {
             backtest_mode = true;
             if (i + 1 < argc && argv[i+1][0] != '-') {
@@ -80,6 +85,12 @@ int main(int argc, char* argv[]) {
             printUsage(argv[0]);
             return 1;
         }
+    }
+
+    // Default to GUI mode unless console mode is explicitly requested
+    if (!console_mode && !analyze_mode && !backtest_mode) {
+        std::cout << "Starting MoneyBot GUI Dashboard..." << std::endl;
+        return gui_main(argc, argv);
     }
 
     // Initialize configuration manager
@@ -166,10 +177,10 @@ int main(int argc, char* argv[]) {
     std::cout << "Press Ctrl+C to stop" << std::endl;
 
     try {
-        // Initialize market data simulator for demo/testing
+        // Initialize market data simulator only if requested or in dry-run mode
         std::unique_ptr<moneybot::MarketDataSimulator> simulator;
-        if (config_manager.isDryRunMode()) {
-            std::cout << "🎯 Initializing Market Data Simulator (Demo Mode)" << std::endl;
+        if (use_simulator || config_manager.isDryRunMode()) {
+            std::cout << "🎯 Initializing Market Data Simulator" << std::endl;
             simulator = std::make_unique<moneybot::MarketDataSimulator>();
             
             // Configure simulation parameters
@@ -204,6 +215,10 @@ int main(int argc, char* argv[]) {
                     simulator->simulateNewsEvent(-1.8, std::chrono::seconds(45)); // -1.8% negative news
                 }
             }).detach();
+        } else {
+            std::cout << "🌐 Connecting to live market data feeds..." << std::endl;
+            // TODO: Initialize real exchange connections here
+            std::cout << "⚠️  Live data not yet implemented. Use --simulator for demo mode." << std::endl;
         }
 
         moneybot::TradingEngine engine(config);

@@ -1,23 +1,19 @@
 #!/bin/bash
-# MoneyBot - Complete Trading System Demo
 
-echo "🚀 MoneyBot - Goldman Sachs-Level Multi-Asset Trading System"
-echo "============================================================"
-echo ""
-echo "Available modes:"
-echo "1. GUI Dashboard (Default)"
-echo "2. Console Trading Mode"
-echo "3. Backtest Mode" 
-echo "4. Clean Build"
-echo ""
+# MoneyBot Run Script
+set -e
 
-# Default to GUI if no argument provided
-MODE=${1:-gui}
+echo "🚀 Starting MoneyBot Trading Dashboard..."
 
-case $MODE in
-    "gui"|"dashboard"|"1")
-        echo "🎮 Starting Goldman Sachs-Level GUI Dashboard..."
-        echo "📊 Multi-Asset Trading Interface with Real-Time Data"
+# Check if binary exists
+if [ ! -f "build/moneybot" ]; then
+    echo "❌ MoneyBot binary not found. Please run ./build.sh first."
+    exit 1
+fi
+
+# Run MoneyBot
+cd build
+./moneybot
         echo "💼 Portfolio Management | ⚡ Arbitrage Scanner | 🛡️ Risk Controls"
         echo ""
         ./build/moneybot --gui

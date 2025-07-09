@@ -1,0 +1,52 @@
+{
+  "trading_mode": "demo",
+  "exchanges": {
+    "binance": {
+      "enabled": false,
+      "use_testnet": true,
+      "api_key": "your_binance_api_key_here",
+      "secret_key": "your_binance_secret_key_here",
+      "base_url": "https://testnet.binance.vision",
+      "ws_url": "wss://testnet.binance.vision/ws",
+      "max_position_size_usd": 1000.0,
+      "rate_limit_per_minute": 1200,
+      "supported_symbols": ["BTCUSDT", "ETHUSDT", "ADAUSDT", "DOTUSDT", "LINKUSDT"]
+    },
+    "coinbase": {
+      "enabled": false,
+      "use_sandbox": true,
+      "api_key": "your_coinbase_api_key_here",
+      "secret_key": "your_coinbase_secret_key_here",
+      "passphrase": "your_coinbase_passphrase_here",
+      "base_url": "https://api-public.sandbox.pro.coinbase.com",
+      "ws_url": "wss://ws-feed-public.sandbox.pro.coinbase.com",
+      "max_position_size_usd": 1000.0,
+      "rate_limit_per_second": 10,
+      "supported_symbols": ["BTC-USD", "ETH-USD", "ADA-USD", "DOT-USD", "LINK-USD"]
+    }
+  },
+  "risk_management": {
+    "max_total_position_usd": 5000.0,
+    "max_daily_loss_usd": 500.0,
+    "max_single_order_usd": 100.0,
+    "enable_stop_loss": true,
+    "stop_loss_percentage": 2.0,
+    "enable_take_profit": true,
+    "take_profit_percentage": 5.0
+  },
+  "arbitrage": {
+    "min_profit_bps": 15.0,
+    "max_execution_time_ms": 5000,
+    "enable_auto_execution": false,
+    "max_arbitrage_size_usd": 500.0
+  },
+  "notifications": {
+    "enable_email": false,
+    "email_address": "your_email@example.com",
+    "enable_webhook": false,
+    "webhook_url": "https://your-webhook-url.com",
+    "notify_on_orders": true,
+    "notify_on_pnl_threshold": 100.0,
+    "notify_on_errors": true
+  }
+}

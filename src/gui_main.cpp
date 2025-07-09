@@ -15,28 +15,13 @@
 #include <string>
 #include <random>
 #include <iostream>
-
-using namespace std;
-
-// Goldman Sachs-Level Multi-Asset Trading Dashboard
-#include <imgui.h>
-#include <imgui_impl_glfw.h>
-#include <imgui_impl_opengl3.h>
-#include <GLFW/glfw3.h>
-#include <thread>
-#include <chrono>
-#include <memory>
-#include <fstream>
-#include <iomanip>
-#include <sstream>
-#include <functional>
-#include <cmath>
-#include <vector>
-#include <string>
-#include <random>
-#include <iostream>
 #include <algorithm>
 #include <map>
+
+// Live trading includes
+#include "exchange_interface.h"
+#include "live_trading_manager.h"
+// #include "binance_exchange.h"  // Uncomment when ready for live trading
 
 using namespace std;
 
@@ -128,10 +113,20 @@ public:
     }
 };
 
-// GUI State Management
+// GUI State Management - Enhanced for Live Trading
 struct GUIState {
-    // Core components
-    shared_ptr<SimpleMarketSimulator> simulator;
+    // Trading system components
+    shared_ptr<SimpleMarketSimulator> simulator;           // For demo mode
+    unique_ptr<LiveMarketDataManager> live_market_manager;  // For live trading
+    unique_ptr<LiveOrderExecutionEngine> order_engine;     // For live orders
+    
+    // Trading mode
+    enum TradingMode {
+        DEMO_SIMULATION,    // Safe simulator
+        PAPER_TRADING,      // Live data, simulated orders
+        LIVE_TRADING        // Real money trading
+    };
+    TradingMode current_mode = LIVE_TRADING;
     
     // Window states
     bool show_portfolio_window = true;
@@ -140,18 +135,19 @@ struct GUIState {
     bool show_risk_window = true;
     bool show_strategy_window = true;
     bool show_main_dashboard = true;
+    bool show_exchange_management = false;  // New window for exchange control
     
     // Layout controls
     bool snap_to_grid = true;
     bool should_setup_docking = true;
-    float grid_size = 50.0f;  // Grid snap size in pixels
+    float grid_size = 50.0f;
     ImGuiID dockspace_id = 0;
     
     // Market data
     vector<string> symbols = {"BTCUSDT", "ETHUSDT", "ADAUSDT", "DOTUSDT", "LINKUSDT"};
     vector<string> exchanges = {"binance", "coinbase", "kraken"};
     
-    // Performance metrics
+    // Live trading metrics (updated from real data)
     double total_pnl = 0.0;
     double daily_pnl = 0.0;
     double portfolio_value = 100000.0;
@@ -160,54 +156,169 @@ struct GUIState {
     double sharpe_ratio = 1.85;
     double max_drawdown = 2.3;
     double var_95 = 3250.0;
-    bool is_demo_mode = true;
+    
+    // Live market statistics
+    struct LiveMarketStats {
+        int connected_exchanges = 0;
+        double avg_latency_ms = 0.0;
+        int updates_per_second = 0;
+        int arbitrage_opportunities = 0;
+        string last_update_time = "Never";
+        bool websocket_connected = false;
+    } live_stats;
     
     GUIState() {
-        // Initialize market data simulator
-        simulator = make_shared<SimpleMarketSimulator>();
-        simulator->start();
-        
-        // Initialize realistic metrics
-        updateMetricsFromLiveData();
-        
-        cout << "🎮 Goldman Sachs-Level GUI Dashboard Initialized" << endl;
-        cout << "📊 Multi-Asset Trading Interface Active" << endl;
+        initializeTradingSystem();
+        cout << "🎮 MoneyBot Professional Trading Dashboard Initialized" << endl;
+        cout << "📊 Mode: " << getModeString() << endl;
     }
     
-    void updateMetricsFromLiveData() {
-        // Update P&L based on simulated trading activity
+    void initializeTradingSystem() {
+        if (current_mode == DEMO_SIMULATION) {
+            // Initialize simulator for safe testing
+            simulator = make_shared<SimpleMarketSimulator>();
+            simulator->start();
+            updateMetricsFromSimulation();
+        } else {
+            // Initialize live trading components
+            live_market_manager = make_unique<LiveMarketDataManager>(current_mode == PAPER_TRADING);
+            order_engine = make_unique<LiveOrderExecutionEngine>(live_market_manager.get());
+            
+            // Start the live market data manager
+            live_market_manager->start();
+            
+            // Add exchanges (start with testnet for safety)
+            // addLiveExchanges();
+            
+            updateMetricsFromLiveData();
+        }
+    }
+    
+    void switchTradingMode(TradingMode new_mode) {
+        if (new_mode == current_mode) return;
+        
+        cout << "⚠️  SWITCHING TRADING MODE ⚠️" << endl;
+        cout << "From: " << getModeString() << " -> To: " << getModeString(new_mode) << endl;
+        
+        // Cleanup current mode
+        if (simulator) {
+            simulator->stop();
+            simulator.reset();
+        }
+        if (live_market_manager) {
+            live_market_manager->stop();
+            live_market_manager.reset();
+        }
+        if (order_engine) {
+            order_engine.reset();
+        }
+        
+        current_mode = new_mode;
+        initializeTradingSystem();
+        
+        if (new_mode == LIVE_TRADING) {
+            cout << "� LIVE TRADING MODE ACTIVE - REAL MONEY AT RISK!" << endl;
+        }
+    }
+    
+    string getModeString(TradingMode mode = TradingMode::DEMO_SIMULATION) const {
+        if (mode == TradingMode::DEMO_SIMULATION) mode = current_mode;
+        switch (mode) {
+            case DEMO_SIMULATION: return "Demo Simulation";
+            case PAPER_TRADING: return "Paper Trading";
+            case LIVE_TRADING: return "Live Trading";
+            default: return "Unknown";
+        }
+    }
+    
+    void updateMetricsFromSimulation() {
+        if (!simulator || !simulator->isRunning()) return;
+        
         static auto last_update = chrono::steady_clock::now();
         auto now = chrono::steady_clock::now();
         auto elapsed = chrono::duration_cast<chrono::seconds>(now - last_update).count();
         
-        if (elapsed > 5) { // Update every 5 seconds
+        if (elapsed > 5) {
             // Simulate realistic P&L fluctuations
-            double pnl_change = (rand() % 2000 - 1000) / 100.0; // -$10 to +$10
+            double pnl_change = (rand() % 2000 - 1000) / 100.0;
             total_pnl += pnl_change;
             daily_pnl += pnl_change;
             
             // Update trade count
-            if (rand() % 10 == 0) { // 10% chance of new trade
+            if (rand() % 10 == 0) {
                 total_trades++;
-                // Update win rate based on random success
-                if (rand() % 100 < 67) { // 67% win rate
+                if (rand() % 100 < 67) {
                     win_rate = (win_rate * (total_trades - 1) + 100.0) / total_trades;
                 } else {
                     win_rate = (win_rate * (total_trades - 1)) / total_trades;
                 }
             }
             
-            // Update portfolio value
             portfolio_value = 100000.0 + total_pnl;
-            
             last_update = now;
         }
     }
     
-    ~GUIState() {
-        if (simulator) {
-            simulator->stop();
+    void updateMetricsFromLiveData() {
+        if (!live_market_manager || !live_market_manager->isRunning()) return;
+        
+        // Get real market statistics
+        auto stats = live_market_manager->getMarketStats();
+        live_stats.connected_exchanges = stats.connected_exchanges;
+        live_stats.avg_latency_ms = stats.avg_latency_ms;
+        live_stats.updates_per_second = stats.updates_per_second;
+        live_stats.arbitrage_opportunities = stats.arbitrage_opportunities;
+        live_stats.last_update_time = stats.last_update_time;
+        
+        // Get real portfolio data from order engine
+        if (order_engine) {
+            portfolio_value = order_engine->getTotalPortfolioValue();
+            daily_pnl = order_engine->getDailyPnL();
+            auto positions = order_engine->getCurrentPositions();
+            // Update other metrics from real trading data
         }
+    }
+    
+    // Utility methods for GUI
+    bool isLiveMode() const { return current_mode != DEMO_SIMULATION; }
+    bool isSimulationMode() const { return current_mode == DEMO_SIMULATION; }
+    bool canExecuteRealTrades() const { return current_mode == LIVE_TRADING; }
+    
+    // Helper method to get market data from the appropriate source
+    LiveTickData getTickData(const std::string& symbol, const std::string& exchange = "binance") {
+        if (isLiveMode() && live_market_manager) {
+            // Try to get live data from exchanges
+            auto* binance_exchange = live_market_manager->getExchange("binance");
+            if (binance_exchange) {
+                return binance_exchange->getLatestTick(symbol);
+            }
+        } else if (simulator) {
+            // Convert simulator TickData to LiveTickData
+            auto sim_tick = simulator->getLatestTick(symbol, exchange);
+            LiveTickData live_tick;
+            live_tick.symbol = sim_tick.symbol;
+            live_tick.exchange = sim_tick.exchange;
+            live_tick.last_price = sim_tick.last_price;
+            live_tick.bid_price = sim_tick.bid_price;
+            live_tick.ask_price = sim_tick.ask_price;
+            live_tick.volume_24h = sim_tick.volume_24h;
+            live_tick.timestamp = sim_tick.timestamp;
+            // Set default values for fields not in TickData
+            live_tick.high_24h = sim_tick.last_price * 1.05;
+            live_tick.low_24h = sim_tick.last_price * 0.95;
+            live_tick.price_change_24h = sim_tick.last_price * 0.02;
+            live_tick.price_change_percent_24h = 2.0;
+            live_tick.server_time = sim_tick.timestamp;
+            return live_tick;
+        }
+        
+        // Return empty tick if no data available
+        return LiveTickData{};
+    }
+    
+    ~GUIState() {
+        if (simulator) simulator->stop();
+        if (live_market_manager) live_market_manager->stop();
     }
 };
 
@@ -222,6 +333,7 @@ void RenderMarketDataWindow(GUIState& state);
 void RenderArbitrageWindow(GUIState& state);
 void RenderRiskManagementWindow(GUIState& state);
 void RenderStrategyPerformanceWindow(GUIState& state);
+void RenderExchangeManagementWindow(GUIState& state);  // New live trading control window
 
 int gui_main(int argc, char** argv) {
     // Setup GLFW window
@@ -279,8 +391,12 @@ int gui_main(int argc, char** argv) {
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
         
-        // Update live data metrics
-        gui_state.updateMetricsFromLiveData();
+        // Update live data metrics based on current mode
+        if (gui_state.isSimulationMode()) {
+            gui_state.updateMetricsFromSimulation();
+        } else {
+            gui_state.updateMetricsFromLiveData();
+        }
         
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
@@ -339,6 +455,13 @@ int gui_main(int argc, char** argv) {
             ImGui::SetNextWindowSize(ImVec2(800, 400), ImGuiCond_FirstUseEver);
             ImGui::SetNextWindowSizeConstraints(ImVec2(400, 250), ImVec2(FLT_MAX, FLT_MAX));
             RenderStrategyPerformanceWindow(gui_state);
+        }
+        
+        if (gui_state.show_exchange_management) {
+            ImGui::SetNextWindowPos(ImVec2(1160, 460), ImGuiCond_FirstUseEver);
+            ImGui::SetNextWindowSize(ImVec2(450, 400), ImGuiCond_FirstUseEver);
+            ImGui::SetNextWindowSizeConstraints(ImVec2(400, 300), ImVec2(FLT_MAX, FLT_MAX));
+            RenderExchangeManagementWindow(gui_state);
         }
         
         // Clean up style vars if grid snapping is enabled
@@ -417,12 +540,39 @@ void RenderMainMenuBar(GUIState& state) {
             ImGui::MenuItem("Arbitrage Scanner", "Ctrl+4", &state.show_arbitrage_window);
             ImGui::MenuItem("Risk Management", "Ctrl+5", &state.show_risk_window);
             ImGui::MenuItem("Strategy Performance", "Ctrl+6", &state.show_strategy_window);
+            ImGui::Separator();
+            ImGui::MenuItem("Exchange Management", "Ctrl+7", &state.show_exchange_management);
+            ImGui::EndMenu();
+        }
+        
+        if (ImGui::BeginMenu("Trading Mode")) {
+            bool is_demo = (state.current_mode == GUIState::DEMO_SIMULATION);
+            bool is_paper = (state.current_mode == GUIState::PAPER_TRADING);
+            bool is_live = (state.current_mode == GUIState::LIVE_TRADING);
+            
+            if (ImGui::MenuItem("🎮 Demo Simulation", nullptr, is_demo)) {
+                state.switchTradingMode(GUIState::DEMO_SIMULATION);
+            }
+            if (ImGui::MenuItem("📊 Paper Trading", nullptr, is_paper)) {
+                state.switchTradingMode(GUIState::PAPER_TRADING);
+            }
+            ImGui::Separator();
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.3f, 0.3f, 1.0f));
+            if (ImGui::MenuItem("🔴 Live Trading", nullptr, is_live)) {
+                state.switchTradingMode(GUIState::LIVE_TRADING);
+            }
+            ImGui::PopStyleColor();
+            
+            ImGui::Separator();
+            ImGui::Text("Current Mode: %s", state.getModeString().c_str());
+            if (state.isLiveMode()) {
+                ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "⚠️ REAL MONEY AT RISK");
+            }
             ImGui::EndMenu();
         }
         
         if (ImGui::BeginMenu("Layout")) {
             if (ImGui::MenuItem("Reset Layout")) {
-                // Reset all window positions to default grid layout
                 state.should_setup_docking = true;
                 std::cout << "🎯 Resetting layout to default grid positions" << std::endl;
             }
@@ -434,12 +584,19 @@ void RenderMainMenuBar(GUIState& state) {
         if (ImGui::BeginMenu("Trading")) {
             if (ImGui::MenuItem("🚨 Emergency Stop", "F1")) {
                 std::cout << "🚨 EMERGENCY STOP: All trading halted!" << std::endl;
+                if (state.order_engine) {
+                    state.order_engine->enableTrading(false);
+                    state.order_engine->cancelAllOrders();
+                }
             }
             if (ImGui::MenuItem("⏸️ Pause All Strategies", "F2")) {
                 std::cout << "⏸️ All strategies paused" << std::endl;
             }
             if (ImGui::MenuItem("🔄 Resume Trading", "F3")) {
                 std::cout << "🔄 Trading resumed" << std::endl;
+                if (state.order_engine && state.canExecuteRealTrades()) {
+                    state.order_engine->enableTrading(true);
+                }
             }
             ImGui::Separator();
             if (ImGui::MenuItem("🎯 Optimize Parameters")) {
@@ -466,10 +623,14 @@ void RenderMainMenuBar(GUIState& state) {
         
         // Status indicators in menu bar
         ImGui::Text("  |  ");
-        if (state.is_demo_mode) {
-            ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "🟡 DEMO MODE");
+        
+        // Trading mode indicator
+        if (state.current_mode == GUIState::DEMO_SIMULATION) {
+            ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "🎮 DEMO");
+        } else if (state.current_mode == GUIState::PAPER_TRADING) {
+            ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "� PAPER");
         } else {
-            ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "🟢 LIVE TRADING");
+            ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "� LIVE");
         }
         
         ImGui::Text("  |  P&L: ");
@@ -478,6 +639,12 @@ void RenderMainMenuBar(GUIState& state) {
         
         ImGui::Text("  |  Trades: %d", state.total_trades);
         ImGui::Text("  |  Sharpe: %.2f", state.sharpe_ratio);
+        
+        // Live market status
+        if (state.isLiveMode()) {
+            ImGui::Text("  |  Exchanges: %d", state.live_stats.connected_exchanges);
+            ImGui::Text("  |  Latency: %.1fms", state.live_stats.avg_latency_ms);
+        }
         
         ImGui::EndMainMenuBar();
     }
@@ -549,8 +716,8 @@ void RenderMainDashboard(GUIState& state) {
             
             // Sample live data for each symbol with enhanced metrics
             for (const auto& symbol : state.symbols) {
-                auto tick = state.simulator->getLatestTick(symbol, "binance");
-                if (!tick.symbol.empty()) {
+                auto tick = state.getTickData(symbol, "binance");
+                if (!tick.symbol.empty() && tick.last_price > 0) {
                     ImGui::TableNextRow();
                     ImGui::TableSetColumnIndex(0);
                     ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.0f, 1.0f), "%s", symbol.c_str());
@@ -638,9 +805,9 @@ void RenderPortfolioWindow(GUIState& state) {
         ImGui::TableSetupColumn("Actions");
         ImGui::TableHeadersRow();
         
-        // Dynamic portfolio data based on simulator
+        // Dynamic portfolio data from appropriate source (live or simulation)
         for (const auto& symbol : state.symbols) {
-            auto tick = state.simulator->getLatestTick(symbol, "binance");
+            auto tick = state.getTickData(symbol, "binance");
             if (!tick.symbol.empty()) {
                 // Calculate realistic holdings and values
                 double base_holding = 0.0;
@@ -760,7 +927,11 @@ void RenderMarketDataWindow(GUIState& state) {
     if (ImGui::BeginTabBar("MarketDataTabs")) {
         // Live quotes tab
         if (ImGui::BeginTabItem("📈 Live Quotes")) {
-            if (state.simulator && state.simulator->isRunning()) {
+            // Show appropriate data based on current mode
+            bool has_data_source = (state.isSimulationMode() && state.simulator && state.simulator->isRunning()) ||
+                                  (state.isLiveMode() && state.live_market_manager && state.live_market_manager->isRunning());
+            
+            if (has_data_source) {
                 if (ImGui::BeginTable("LiveMarketData", 8, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Sortable)) {
                     ImGui::TableSetupColumn("Exchange");
                     ImGui::TableSetupColumn("Symbol");
@@ -772,14 +943,15 @@ void RenderMarketDataWindow(GUIState& state) {
                     ImGui::TableSetupColumn("Volatility");
                     ImGui::TableHeadersRow();
                     
-                    // Get data from all exchange/symbol combinations
-                    for (const auto& exchange : state.exchanges) {
+                    // Get data from appropriate source based on mode
+                    if (state.isLiveMode()) {
+                        // Live mode: only show binance data for now
                         for (const auto& symbol : state.symbols) {
-                            auto tick = state.simulator->getLatestTick(symbol, exchange);
-                            if (!tick.symbol.empty()) {
+                            auto tick = state.getTickData(symbol, "binance");
+                            if (!tick.symbol.empty() && tick.last_price > 0) {
                                 ImGui::TableNextRow();
                                 ImGui::TableSetColumnIndex(0);
-                                ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.0f, 1.0f), "%s", exchange.c_str());
+                                ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "binance");  // Green for live
                                 ImGui::TableSetColumnIndex(1);
                                 ImGui::Text("%s", symbol.substr(0, symbol.find("USDT")).c_str());
                                 ImGui::TableSetColumnIndex(2);
@@ -789,20 +961,59 @@ void RenderMarketDataWindow(GUIState& state) {
                                 ImGui::TableSetColumnIndex(4);
                                 ImGui::Text("$%.2f", tick.last_price);
                                 ImGui::TableSetColumnIndex(5);
-                                double spread_bps = ((tick.ask_price - tick.bid_price) / tick.bid_price) * 10000.0;
-                                ImGui::Text("%.1f", spread_bps);
+                                if (tick.bid_price > 0) {
+                                    double spread_bps = ((tick.ask_price - tick.bid_price) / tick.bid_price) * 10000.0;
+                                    ImGui::Text("%.1f", spread_bps);
+                                } else {
+                                    ImGui::Text("--");
+                                }
                                 ImGui::TableSetColumnIndex(6);
                                 ImGui::Text("$%.0fM", tick.volume_24h / 1000000.0);
                                 ImGui::TableSetColumnIndex(7);
-                                double volatility = 15.0 + sin(glfwGetTime() + hash<string>{}(symbol)) * 5.0;
-                                ImGui::Text("%.1f%%", volatility);
+                                ImGui::Text("%.1f%%", tick.price_change_percent_24h);
+                            }
+                        }
+                    } else {
+                        // Simulation mode: show all exchanges
+                        for (const auto& exchange : state.exchanges) {
+                            for (const auto& symbol : state.symbols) {
+                                auto tick = state.getTickData(symbol, exchange);
+                                if (!tick.symbol.empty() && tick.last_price > 0) {
+                                    ImGui::TableNextRow();
+                                    ImGui::TableSetColumnIndex(0);
+                                    ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.0f, 1.0f), "%s", exchange.c_str());
+                                    ImGui::TableSetColumnIndex(1);
+                                    ImGui::Text("%s", symbol.substr(0, symbol.find("USDT")).c_str());
+                                    ImGui::TableSetColumnIndex(2);
+                                    ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "$%.2f", tick.bid_price);
+                                    ImGui::TableSetColumnIndex(3);
+                                    ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "$%.2f", tick.ask_price);
+                                    ImGui::TableSetColumnIndex(4);
+                                    ImGui::Text("$%.2f", tick.last_price);
+                                    ImGui::TableSetColumnIndex(5);
+                                    if (tick.bid_price > 0) {
+                                        double spread_bps = ((tick.ask_price - tick.bid_price) / tick.bid_price) * 10000.0;
+                                        ImGui::Text("%.1f", spread_bps);
+                                    } else {
+                                        ImGui::Text("--");
+                                    }
+                                    ImGui::TableSetColumnIndex(6);
+                                    ImGui::Text("$%.0fM", tick.volume_24h / 1000000.0);
+                                    ImGui::TableSetColumnIndex(7);
+                                    double volatility = 15.0 + sin(glfwGetTime() + hash<string>{}(symbol)) * 5.0;
+                                    ImGui::Text("%.1f%%", volatility);
+                                }
                             }
                         }
                     }
                     ImGui::EndTable();
                 }
             } else {
-                ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "⚠️ Market data feed disconnected");
+                if (state.isLiveMode()) {
+                    ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "⚠️ Live market data feed disconnected");
+                } else {
+                    ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "⚠️ Market data simulator not running");
+                }
             }
             ImGui::EndTabItem();
         }
@@ -823,8 +1034,8 @@ void RenderMarketDataWindow(GUIState& state) {
                 ImGui::Text("📖 Order Book for %s", state.symbols[selected_symbol].c_str());
                 ImGui::Separator();
                 
-                auto tick = state.simulator->getLatestTick(state.symbols[selected_symbol], "binance");
-                if (!tick.symbol.empty()) {
+                auto tick = state.getTickData(state.symbols[selected_symbol], "binance");
+                if (!tick.symbol.empty() && tick.last_price > 0) {
                     ImGui::Text("Mid Price: $%.2f", (tick.bid_price + tick.ask_price) / 2.0);
                     ImGui::Text("Spread: $%.4f (%.2f bps)", 
                                tick.ask_price - tick.bid_price,
@@ -878,15 +1089,29 @@ void RenderMarketDataWindow(GUIState& state) {
                 
                 for (const auto& symbol : state.symbols) {
                     double best_bid = 0.0, best_ask = 999999.0;
-                    double min_price = 999999.0, max_price = 0.0;                        for (const auto& exchange : state.exchanges) {
-                            auto tick = state.simulator->getLatestTick(symbol, exchange);
-                            if (!tick.symbol.empty()) {
+                    double min_price = 999999.0, max_price = 0.0;
+                    
+                    if (state.isLiveMode()) {
+                        // In live mode, only check binance for now
+                        auto tick = state.getTickData(symbol, "binance");
+                        if (!tick.symbol.empty() && tick.last_price > 0) {
+                            best_bid = tick.bid_price;
+                            best_ask = tick.ask_price;
+                            min_price = tick.last_price;
+                            max_price = tick.last_price;
+                        }
+                    } else {
+                        // In simulation mode, check all exchanges
+                        for (const auto& exchange : state.exchanges) {
+                            auto tick = state.getTickData(symbol, exchange);
+                            if (!tick.symbol.empty() && tick.last_price > 0) {
                                 best_bid = max(best_bid, tick.bid_price);
                                 best_ask = min(best_ask, tick.ask_price);
                                 min_price = min(min_price, tick.last_price);
                                 max_price = max(max_price, tick.last_price);
                             }
                         }
+                    }
                     
                     if (best_bid > 0 && best_ask < 999999) {
                         double variance = ((max_price - min_price) / min_price) * 100.0;
@@ -992,17 +1217,39 @@ void RenderArbitrageWindow(GUIState& state) {
         ImGui::TableSetupColumn("Action");
         ImGui::TableHeadersRow();
         
-        // Dynamic arbitrage opportunities (calculated from live simulator data)
-        for (const auto& symbol : state.symbols) {
-            for (size_t i = 0; i < state.exchanges.size(); ++i) {
-                for (size_t j = i + 1; j < state.exchanges.size(); ++j) {
-                    auto tick1 = state.simulator->getLatestTick(symbol, state.exchanges[i]);
-                    auto tick2 = state.simulator->getLatestTick(symbol, state.exchanges[j]);
-                    
-                    if (!tick1.symbol.empty() && !tick2.symbol.empty()) {
-                        // Calculate arbitrage opportunity
-                        double price_diff = abs(tick2.last_price - tick1.last_price);
-                        double profit_bps = (price_diff / min(tick1.last_price, tick2.last_price)) * 10000.0;
+        // Dynamic arbitrage opportunities (calculated from live data)
+        if (state.isLiveMode()) {
+            // In live mode, we don't have multiple exchanges yet, so show placeholder
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::Text("--");
+            ImGui::TableSetColumnIndex(1);
+            ImGui::Text("--");
+            ImGui::TableSetColumnIndex(2);
+            ImGui::Text("--");
+            ImGui::TableSetColumnIndex(3);
+            ImGui::Text("--");
+            ImGui::TableSetColumnIndex(4);
+            ImGui::Text("--");
+            ImGui::TableSetColumnIndex(5);
+            ImGui::Text("--");
+            ImGui::TableSetColumnIndex(6);
+            ImGui::Text("--");
+            ImGui::TableSetColumnIndex(7);
+            ImGui::Text("Live mode: Multi-exchange arbitrage coming soon");
+        } else {
+            // Simulation mode arbitrage calculation
+            for (const auto& symbol : state.symbols) {
+                for (size_t i = 0; i < state.exchanges.size(); ++i) {
+                    for (size_t j = i + 1; j < state.exchanges.size(); ++j) {
+                        auto tick1 = state.getTickData(symbol, state.exchanges[i]);
+                        auto tick2 = state.getTickData(symbol, state.exchanges[j]);
+                        
+                        if (!tick1.symbol.empty() && !tick2.symbol.empty() && 
+                            tick1.last_price > 0 && tick2.last_price > 0) {
+                            // Calculate arbitrage opportunity
+                            double price_diff = abs(tick2.last_price - tick1.last_price);
+                            double profit_bps = (price_diff / min(tick1.last_price, tick2.last_price)) * 10000.0;
                         
                         // Add some realistic noise and timing
                         profit_bps += sin(glfwGetTime() + i + j) * 5.0;
@@ -1048,6 +1295,7 @@ void RenderArbitrageWindow(GUIState& state) {
                     }
                 }
             }
+        }
         }
         ImGui::EndTable();
     }
@@ -1228,6 +1476,133 @@ void RenderStrategyPerformanceWindow(GUIState& state) {
     if (ImGui::Button("⚡ Quick Backtest")) {
         std::cout << "⚡ Running quick strategy backtest..." << std::endl;
     }
+    
+    ImGui::End();
+}
+
+void RenderExchangeManagementWindow(GUIState& state) {
+    ImGui::Begin("🏢 Exchange Management & Live Trading Controls", &state.show_exchange_management);
+    
+    // Big warning if in live mode
+    if (state.current_mode == GUIState::LIVE_TRADING) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
+        ImGui::Text("🚨 LIVE TRADING MODE - REAL MONEY AT RISK! 🚨");
+        ImGui::PopStyleColor();
+        ImGui::Separator();
+    }
+    
+    // Trading mode controls
+    ImGui::Text("🎮 Trading Mode:");
+    if (ImGui::RadioButton("Demo Simulation", state.current_mode == GUIState::DEMO_SIMULATION)) {
+        state.switchTradingMode(GUIState::DEMO_SIMULATION);
+    }
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Paper Trading", state.current_mode == GUIState::PAPER_TRADING)) {
+        state.switchTradingMode(GUIState::PAPER_TRADING);
+    }
+    ImGui::SameLine();
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
+    if (ImGui::RadioButton("Live Trading", state.current_mode == GUIState::LIVE_TRADING)) {
+        state.switchTradingMode(GUIState::LIVE_TRADING);
+    }
+    ImGui::PopStyleColor();
+    
+    ImGui::Separator();
+    
+    if (state.isLiveMode()) {
+        // Live market statistics
+        ImGui::Text("📊 Live Market Statistics:");
+        ImGui::Text("Connected Exchanges: %d", state.live_stats.connected_exchanges);
+        ImGui::Text("Average Latency: %.1f ms", state.live_stats.avg_latency_ms);
+        ImGui::Text("Updates/Second: %d", state.live_stats.updates_per_second);
+        ImGui::Text("Arbitrage Opportunities: %d", state.live_stats.arbitrage_opportunities);
+        ImGui::Text("Last Update: %s", state.live_stats.last_update_time.c_str());
+        
+        ImGui::Separator();
+        
+        // Exchange status table
+        if (ImGui::BeginTable("ExchangeStatus", 4, ImGuiTableFlags_Borders)) {
+            ImGui::TableSetupColumn("Exchange");
+            ImGui::TableSetupColumn("Status");
+            ImGui::TableSetupColumn("Latency");
+            ImGui::TableSetupColumn("Actions");
+            ImGui::TableHeadersRow();
+            
+            // Mock exchange status for now
+            for (const auto& exchange : state.exchanges) {
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                ImGui::Text("%s", exchange.c_str());
+                ImGui::TableSetColumnIndex(1);
+                if (state.live_stats.connected_exchanges > 0) {
+                    ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "🟢 CONNECTED");
+                } else {
+                    ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "🔴 DISCONNECTED");
+                }
+                ImGui::TableSetColumnIndex(2);
+                ImGui::Text("%.1f ms", state.live_stats.avg_latency_ms);
+                ImGui::TableSetColumnIndex(3);
+                if (ImGui::Button(("Test##" + exchange).c_str())) {
+                    std::cout << "🧪 Testing connection to " << exchange << std::endl;
+                }
+            }
+            ImGui::EndTable();
+        }
+        
+        ImGui::Separator();
+        
+        // Order execution controls
+        ImGui::Text("⚡ Order Execution:");
+        bool trading_enabled = state.order_engine && state.order_engine->isTradingEnabled();
+        if (ImGui::Checkbox("Enable Live Trading", &trading_enabled)) {
+            if (state.order_engine) {
+                state.order_engine->enableTrading(trading_enabled);
+                std::cout << (trading_enabled ? "🟢 Live trading ENABLED" : "🔴 Live trading DISABLED") << std::endl;
+            }
+        }
+        
+        if (state.canExecuteRealTrades()) {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "⚠️ Orders will use real money!");
+        }
+    } else {
+        // Simulation mode status
+        ImGui::Text("🎮 Simulation Mode Active");
+        if (state.simulator && state.simulator->isRunning()) {
+            ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "✅ Market simulator running");
+            ImGui::Text("📊 Symbols: %zu", state.symbols.size());
+            ImGui::Text("🏢 Mock Exchanges: %zu", state.exchanges.size());
+        } else {
+            ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "⚠️ Market simulator not running");
+        }
+    }
+    
+    ImGui::Separator();
+    
+    // Emergency controls
+    ImGui::Text("🚨 Emergency Controls:");
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.1f, 0.1f, 1.0f));
+    if (ImGui::Button("🚨 EMERGENCY STOP ALL", ImVec2(200, 30))) {
+        std::cout << "🚨 EMERGENCY STOP: All trading systems halted!" << std::endl;
+        if (state.order_engine) {
+            state.order_engine->enableTrading(false);
+            state.order_engine->cancelAllOrders();
+        }
+        if (state.live_market_manager) {
+            state.live_market_manager->disconnectAll();
+        }
+    }
+    ImGui::PopStyleColor();
+    
+    ImGui::SameLine();
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.5f, 0.0f, 1.0f));
+    if (ImGui::Button("⏸️ Disconnect All", ImVec2(150, 30))) {
+        std::cout << "⏸️ Disconnecting from all exchanges" << std::endl;
+        if (state.live_market_manager) {
+            state.live_market_manager->disconnectAll();
+        }
+    }
+    ImGui::PopStyleColor();
     
     ImGui::End();
 }

@@ -65,6 +65,7 @@ include_directories(
     lib/imgui
     lib/imgui/backends
     ${GLFW_INCLUDE_DIRS}
+    /opt/homebrew/include
 )
 
 add_executable(moneybot
@@ -85,6 +86,8 @@ add_executable(moneybot
     src/exchange_connectors.cpp
     src/config_manager.cpp
     src/market_data_simulator.cpp
+    src/live_trading_manager.cpp
+    src/binance_exchange.cpp
     src/dashboard_metrics_widget.cpp
     src/dashboard_orderbook_widget.cpp
     src/advanced_orderbook_widget.cpp
