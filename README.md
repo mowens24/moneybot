@@ -1,8 +1,8 @@
-# MoneyBot - Goldman Sachs-Level Multi-Asset Crypto Trading System
+# MoneyBot - Multi-Asset Crypto Trading System
 
 MoneyBot is a production-grade, institutional-quality cryptocurrency trading system written in C++. Featuring advanced multi-exchange arbitrage, statistical arbitrage, portfolio optimization, and comprehensive risk management - designed to compete with Wall Street's most sophisticated trading infrastructure.
 
-## 🚀 Goldman Sachs-Level Features
+## 🚀  Level Features
 
 ### Multi-Asset Trading Architecture
 - **Multi-Exchange Gateway**: Simultaneous trading across Binance, Coinbase, Kraken with unified order book aggregation
@@ -49,7 +49,7 @@ MoneyBot is a production-grade, institutional-quality cryptocurrency trading sys
 {
   "strategy": {
     "type": "multi_asset",
-    "mode": "goldman_sachs_level"
+    "mode": "_sachs_level"
   },
   "multi_asset": {
     "exchanges": [
@@ -199,7 +199,7 @@ MoneyBot in multi-asset mode displays institutional-level status updates:
 ```
 === MoneyBot HFT Trading System ===
 🚀 MULTI-ASSET TRADING MODE
-Strategy: Multi-Asset Goldman Sachs Level
+Strategy: Multi-Asset  Sachs Level
 Exchanges: binance coinbase kraken 
 Strategies: cross_exchange_arbitrage portfolio_optimization statistical_arbitrage 
 Press Ctrl+C to stop
@@ -384,7 +384,7 @@ services:
 {
   "strategy": {
     "type": "multi_asset",
-    "mode": "goldman_sachs_level"
+    "mode": "_sachs_level"
   },
   "multi_asset": {
     "exchanges": [
@@ -469,7 +469,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Trading cryptocurrencies involves substantial risk of loss. This software is provided for educational and research purposes. Use at your own risk. The authors are not responsible for any financial losses.**
 
-**IMPORTANT: Multi-asset and cross-exchange trading significantly increases complexity and risk. Goldman Sachs-level features require institutional risk management expertise.**
+**IMPORTANT: Multi-asset and cross-exchange trading significantly increases complexity and risk.  level features require institutional risk management expertise.**
 
 - Always test with dry-run mode first
 - Start with small position sizes across all exchanges  
