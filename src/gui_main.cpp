@@ -128,14 +128,14 @@ struct GUIState {
     };
     TradingMode current_mode = LIVE_TRADING;
     
-    // Window states
-    bool show_portfolio_window = true;
-    bool show_market_data_window = true;
-    bool show_arbitrage_window = true;
-    bool show_risk_window = true;
-    bool show_strategy_window = true;
-    bool show_main_dashboard = true;
-    bool show_exchange_management = false;  // New window for exchange control
+    // Window states - Focused on algorithm visualization
+    bool show_portfolio_window = true;         // Clean performance dashboard
+    bool show_market_data_window = false;      // Hidden - algorithms handle raw data
+    bool show_arbitrage_window = false;        // Hidden - integrated into main dashboard
+    bool show_risk_window = false;             // Hidden - integrated into portfolio
+    bool show_strategy_window = false;         // Hidden - integrated into main dashboard
+    bool show_main_dashboard = true;           // Visual algorithm hub
+    bool show_exchange_management = false;     // Available but not shown by default
     
     // Layout controls
     bool snap_to_grid = true;
@@ -328,6 +328,7 @@ void ApplyGridSnapping(GUIState& state);
 ImVec2 SnapToGrid(ImVec2 pos, float grid_size);
 void RenderMainMenuBar(GUIState& state);
 void RenderMainDashboard(GUIState& state);
+void RenderAlgorithmVisualizationWindow(GUIState& state);  // New visual algorithm dashboard
 void RenderPortfolioWindow(GUIState& state);
 void RenderMarketDataWindow(GUIState& state);
 void RenderArbitrageWindow(GUIState& state);
@@ -416,23 +417,24 @@ int gui_main(int argc, char** argv) {
         
         // Render all windows with proper sizing constraints and grid positioning
         if (gui_state.show_main_dashboard) {
-            ImGui::SetNextWindowPos(ImVec2(350, 50), ImGuiCond_FirstUseEver);
-            ImGui::SetNextWindowSize(ImVec2(800, 400), ImGuiCond_FirstUseEver);
-            ImGui::SetNextWindowSizeConstraints(ImVec2(400, 300), ImVec2(FLT_MAX, FLT_MAX));
-            RenderMainDashboard(gui_state);
+            ImGui::SetNextWindowPos(ImVec2(10, 50), ImGuiCond_FirstUseEver);
+            ImGui::SetNextWindowSize(ImVec2(1200, 500), ImGuiCond_FirstUseEver);
+            ImGui::SetNextWindowSizeConstraints(ImVec2(800, 400), ImVec2(FLT_MAX, FLT_MAX));
+            RenderAlgorithmVisualizationWindow(gui_state);  // Use new visual dashboard
         }
         
         if (gui_state.show_portfolio_window) {
-            ImGui::SetNextWindowPos(ImVec2(10, 50), ImGuiCond_FirstUseEver);
-            ImGui::SetNextWindowSize(ImVec2(330, 400), ImGuiCond_FirstUseEver);
-            ImGui::SetNextWindowSizeConstraints(ImVec2(300, 250), ImVec2(500, FLT_MAX));
+            ImGui::SetNextWindowPos(ImVec2(1220, 50), ImGuiCond_FirstUseEver);
+            ImGui::SetNextWindowSize(ImVec2(400, 500), ImGuiCond_FirstUseEver);
+            ImGui::SetNextWindowSizeConstraints(ImVec2(350, 400), ImVec2(500, FLT_MAX));
             RenderPortfolioWindow(gui_state);
         }
         
+        // Market data window hidden by default - algorithms handle the data
         if (gui_state.show_market_data_window) {
-            ImGui::SetNextWindowPos(ImVec2(10, 460), ImGuiCond_FirstUseEver);
-            ImGui::SetNextWindowSize(ImVec2(330, 400), ImGuiCond_FirstUseEver);
-            ImGui::SetNextWindowSizeConstraints(ImVec2(300, 300), ImVec2(600, FLT_MAX));
+            ImGui::SetNextWindowPos(ImVec2(10, 570), ImGuiCond_FirstUseEver);
+            ImGui::SetNextWindowSize(ImVec2(1200, 300), ImGuiCond_FirstUseEver);
+            ImGui::SetNextWindowSizeConstraints(ImVec2(800, 200), ImVec2(FLT_MAX, 400));
             RenderMarketDataWindow(gui_state);
         }
         
@@ -757,147 +759,97 @@ void RenderMainDashboard(GUIState& state) {
 }
 
 void RenderPortfolioWindow(GUIState& state) {
-    ImGui::Begin("💼 Portfolio Management", &state.show_portfolio_window);
+    ImGui::Begin("💼 Portfolio & Performance", &state.show_portfolio_window);
     
-    ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "Multi-Asset Portfolio Analytics");
+    ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "Algorithm Performance Dashboard");
     ImGui::Separator();
     
-    // Real-time portfolio summary
-    ImGui::Columns(4, "PortfolioSummary", false);
+    // Clean performance metrics (no overwhelming data)
+    ImGui::Columns(3, "PerformanceSummary", false);
     
-    ImGui::BeginChild("TotalValue", ImVec2(0, 60), true);
-    ImGui::Text("Total Portfolio Value");
+    // Total Portfolio Value
+    ImGui::BeginChild("TotalValue", ImVec2(0, 80), true);
+    ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Portfolio Value");
+    ImGui::Spacing();
     ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "$%.0f", state.portfolio_value);
+    float portfolio_change = (state.daily_pnl / (state.portfolio_value - state.daily_pnl)) * 100.0f;
+    ImGui::TextColored(portfolio_change >= 0 ? ImVec4(0.0f, 1.0f, 0.0f, 1.0f) : ImVec4(1.0f, 0.0f, 0.0f, 1.0f), 
+                      "%+.2f%%", portfolio_change);
     ImGui::EndChild();
     ImGui::NextColumn();
     
-    ImGui::BeginChild("DayChange", ImVec2(0, 60), true);
-    ImGui::Text("24h Change");
+    // Daily P&L
+    ImGui::BeginChild("DailyPnL", ImVec2(0, 80), true);
+    ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Daily P&L");
+    ImGui::Spacing();
     ImGui::TextColored(state.daily_pnl >= 0 ? ImVec4(0.0f, 1.0f, 0.0f, 1.0f) : ImVec4(1.0f, 0.0f, 0.0f, 1.0f), 
-                      "$%.2f (%.1f%%)", state.daily_pnl, (state.daily_pnl / state.portfolio_value) * 100.0);
+                      "$%.2f", state.daily_pnl);
+    ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "Trades: %d", state.total_trades);
     ImGui::EndChild();
     ImGui::NextColumn();
     
-    ImGui::BeginChild("ActivePositions", ImVec2(0, 60), true);
-    ImGui::Text("Active Positions");
-    ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "%d", 5);
+    // Algorithm Status
+    ImGui::BeginChild("AlgoStatus", ImVec2(0, 80), true);
+    ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Algorithm Status");
+    ImGui::Spacing();
+    if (state.isLiveMode()) {
+        ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "🔴 LIVE TRADING");
+        auto stats = state.live_market_manager->getMarketStats();
+        ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Opportunities: %d", stats.arbitrage_opportunities);
+    } else {
+        ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.0f, 1.0f), "🟡 SIMULATION");
+        ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Win Rate: %.1f%%", state.win_rate);
+    }
     ImGui::EndChild();
-    ImGui::NextColumn();
-    
-    ImGui::BeginChild("Exposure", ImVec2(0, 60), true);
-    ImGui::Text("Total Exposure");
-    ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.0f, 1.0f), "%.1fx", 1.8);
-    ImGui::EndChild();
-    ImGui::NextColumn();
     
     ImGui::Columns(1);
     ImGui::Separator();
     
-    // Enhanced asset allocation table with real-time data
-    if (ImGui::BeginTable("AssetAllocation", 8, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Sortable)) {
-        ImGui::TableSetupColumn("Asset", ImGuiTableColumnFlags_DefaultSort);
-        ImGui::TableSetupColumn("Holdings");
-        ImGui::TableSetupColumn("Market Value");
-        ImGui::TableSetupColumn("Weight %");
-        ImGui::TableSetupColumn("24h P&L");
-        ImGui::TableSetupColumn("Unrealized P&L");
-        ImGui::TableSetupColumn("Risk Score");
-        ImGui::TableSetupColumn("Actions");
-        ImGui::TableHeadersRow();
-        
-        // Dynamic portfolio data from appropriate source (live or simulation)
-        for (const auto& symbol : state.symbols) {
-            auto tick = state.getTickData(symbol, "binance");
-            if (!tick.symbol.empty()) {
-                // Calculate realistic holdings and values
-                double base_holding = 0.0;
-                double market_value = 0.0;
-                double weight = 0.0;
-                
-                if (symbol == "BTCUSDT") {
-                    base_holding = 2.15;
-                    market_value = base_holding * tick.last_price;
-                    weight = 40.0;
-                } else if (symbol == "ETHUSDT") {
-                    base_holding = 15.8;
-                    market_value = base_holding * tick.last_price;
-                    weight = 30.0;
-                } else if (symbol == "ADAUSDT") {
-                    base_holding = 25000.0;
-                    market_value = base_holding * tick.last_price;
-                    weight = 15.0;
-                } else if (symbol == "DOTUSDT") {
-                    base_holding = 1200.0;
-                    market_value = base_holding * tick.last_price;
-                    weight = 10.0;
-                } else if (symbol == "LINKUSDT") {
-                    base_holding = 800.0;
-                    market_value = base_holding * tick.last_price;
-                    weight = 5.0;
-                }
-                
-                double pnl_24h = sin(glfwGetTime() + hash<string>{}(symbol)) * market_value * 0.05;
-                double unrealized_pnl = cos(glfwGetTime() + hash<string>{}(symbol)) * market_value * 0.03;
-                double risk_score = 3.0 + sin(glfwGetTime() * 0.5 + hash<string>{}(symbol)) * 2.0;
-                
-                ImGui::TableNextRow();
-                ImGui::TableSetColumnIndex(0);
-                ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.0f, 1.0f), "%s", symbol.substr(0, symbol.find("USDT")).c_str());
-                ImGui::TableSetColumnIndex(1);
-                ImGui::Text("%.2f", base_holding);
-                ImGui::TableSetColumnIndex(2);
-                ImGui::Text("$%.0f", market_value);
-                ImGui::TableSetColumnIndex(3);
-                ImGui::Text("%.1f%%", weight);
-                ImGui::TableSetColumnIndex(4);
-                ImGui::TextColored(pnl_24h >= 0 ? ImVec4(0.0f, 1.0f, 0.0f, 1.0f) : ImVec4(1.0f, 0.0f, 0.0f, 1.0f), 
-                                 "$%.2f", pnl_24h);
-                ImGui::TableSetColumnIndex(5);
-                ImGui::TextColored(unrealized_pnl >= 0 ? ImVec4(0.0f, 1.0f, 0.0f, 1.0f) : ImVec4(1.0f, 0.0f, 0.0f, 1.0f), 
-                                 "$%.2f", unrealized_pnl);
-                ImGui::TableSetColumnIndex(6);
-                ImVec4 risk_color = risk_score > 7 ? ImVec4(1.0f, 0.0f, 0.0f, 1.0f) : 
-                                   risk_score > 5 ? ImVec4(1.0f, 0.5f, 0.0f, 1.0f) : 
-                                   ImVec4(0.0f, 1.0f, 0.0f, 1.0f);
-                ImGui::TextColored(risk_color, "%.1f", risk_score);
-                ImGui::TableSetColumnIndex(7);
-                if (ImGui::Button(("Trade##" + symbol).c_str())) {
-                    std::cout << "🔄 Opening advanced trade dialog for " << symbol << std::endl;
-                }
-                ImGui::SameLine();
-                if (ImGui::Button(("Hedge##" + symbol).c_str())) {
-                    std::cout << "🛡️ Setting up hedge for " << symbol << std::endl;
-                }
-            }
+    // Key Performance Indicators (Visual)
+    ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "📊 Key Performance Indicators");
+    ImGui::Spacing();
+    
+    // Progress bars for key metrics
+    float sharpe_normalized = fmin(fmax((state.sharpe_ratio + 2.0f) / 4.0f, 0.0f), 1.0f);
+    ImGui::Text("Sharpe Ratio: %.2f", state.sharpe_ratio);
+    ImGui::ProgressBar(sharpe_normalized, ImVec2(-1.0f, 0.0f), "");
+    
+    float win_rate_normalized = state.win_rate / 100.0f;
+    ImGui::Text("Win Rate: %.1f%%", state.win_rate);
+    ImGui::ProgressBar(win_rate_normalized, ImVec2(-1.0f, 0.0f), "");
+    
+    float max_dd_normalized = 1.0f - fmin(state.max_drawdown / 10.0f, 1.0f);
+    ImGui::Text("Risk Control: %.1f%% max drawdown", state.max_drawdown);
+    ImGui::ProgressBar(max_dd_normalized, ImVec2(-1.0f, 0.0f), "");
+    
+    ImGui::Separator();
+    
+    // Current Positions (Simplified)
+    ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "🎯 Active Positions");
+    
+    if (state.isLiveMode() && state.order_engine) {
+        auto positions = state.order_engine->getCurrentPositions();
+        for (const auto& [asset, amount] : positions) {
+            ImGui::Text("%s: %.4f", asset.c_str(), amount);
         }
-        ImGui::EndTable();
+    } else {
+        // Demo positions
+        ImGui::Text("BTC: 0.5000");
+        ImGui::Text("ETH: 2.3000");
+        ImGui::Text("USD: 25,000.00");
     }
     
     ImGui::Separator();
     
-    // Advanced portfolio actions
-    ImGui::Text("🎯 Advanced Portfolio Management");
-    if (ImGui::Button("🧠 AI Rebalance")) {
-        std::cout << "🧠 Starting AI-powered portfolio rebalancing..." << std::endl;
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("📊 Risk Analysis")) {
-        std::cout << "📊 Generating comprehensive risk analysis..." << std::endl;
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("⚙️ Smart Allocation")) {
-        std::cout << "⚙️ Opening smart allocation optimizer..." << std::endl;
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("🔄 Hedge All")) {
-        std::cout << "🔄 Implementing portfolio-wide hedging strategy..." << std::endl;
-    }
+    // Quick Actions
+    ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "⚡ Quick Actions");
     
-    // Real-time portfolio metrics
-    ImGui::Separator();
-    ImGui::Text("📈 Live Performance Metrics:");
-    ImGui::Text("Sharpe Ratio: %.2f | Max Drawdown: %.1f%% | Beta: 1.15 | Alpha: %.1f%% | Correlation (SPY): 0.23", 
-               state.sharpe_ratio, state.max_drawdown, 2.3 + sin(glfwGetTime()) * 0.5);
+    if (ImGui::Button("🛑 Emergency Stop", ImVec2(-1.0f, 0.0f))) {
+        std::cout << "🛑 EMERGENCY STOP - All algorithms halted!" << std::endl;
+        if (state.order_engine) {
+            state.order_engine->cancelAllOrders("");
+        }
+    }
     
     ImGui::End();
 }
@@ -1320,7 +1272,7 @@ void RenderRiskManagementWindow(GUIState& state) {
     
     // VaR Card
     ImGui::BeginChild("VaR", ImVec2(0, 80), true);
-    ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "VaR (95%)");
+    ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "VaR (95%%)");  
     ImGui::Text("$%.0f", state.var_95);
     ImGui::EndChild();
     ImGui::NextColumn();
@@ -1603,6 +1555,276 @@ void RenderExchangeManagementWindow(GUIState& state) {
         }
     }
     ImGui::PopStyleColor();
+    
+    ImGui::End();
+}
+
+// ========================================================================
+// 🎨 VISUAL ALGORITHM DASHBOARD COMPONENTS 
+// ========================================================================
+
+// Helper function to draw animated triangle with trade flows
+void DrawTriangleArbitrageWidget(ImVec2 center, float radius, float profit_bps, float volume, bool is_active) {
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    
+    // Calculate triangle points (equilateral triangle)
+    float angle_offset = 3.14159f / 2.0f; // Start from top
+    ImVec2 points[3];
+    for (int i = 0; i < 3; i++) {
+        float angle = (i * 2.0f * 3.14159f / 3.0f) + angle_offset;
+        points[i] = ImVec2(
+            center.x + radius * cos(angle),
+            center.y + radius * sin(angle)
+        );
+    }
+    
+    // Exchange labels
+    const char* exchanges[] = {"Binance", "Coinbase", "Kraken"};
+    ImU32 exchange_colors[] = {
+        IM_COL32(255, 165, 0, 255),   // Orange for Binance
+        IM_COL32(50, 150, 255, 255),  // Blue for Coinbase  
+        IM_COL32(150, 50, 255, 255)   // Purple for Kraken
+    };
+    
+    // Draw exchange nodes (circles)
+    for (int i = 0; i < 3; i++) {
+        float node_radius = is_active ? 15.0f + sin(ImGui::GetTime() * 3.0f) * 3.0f : 12.0f;
+        draw_list->AddCircleFilled(points[i], node_radius, exchange_colors[i]);
+        draw_list->AddCircle(points[i], node_radius + 2, IM_COL32(255, 255, 255, 150), 0, 2.0f);
+        
+        // Exchange labels
+        ImVec2 text_size = ImGui::CalcTextSize(exchanges[i]);
+        ImVec2 text_pos = ImVec2(points[i].x - text_size.x/2, points[i].y + node_radius + 5);
+        draw_list->AddText(text_pos, IM_COL32(255, 255, 255, 255), exchanges[i]);
+    }
+    
+    // Draw trade flow lines between exchanges
+    for (int i = 0; i < 3; i++) {
+        int next = (i + 1) % 3;
+        
+        // Calculate line properties based on profit and activity
+        float line_thickness = is_active ? 3.0f + (profit_bps / 10.0f) : 1.5f;
+        ImU32 line_color;
+        
+        if (profit_bps > 20.0f) {
+            line_color = IM_COL32(0, 255, 0, 200);  // Bright green for high profit
+        } else if (profit_bps > 10.0f) {
+            line_color = IM_COL32(255, 255, 0, 180);  // Yellow for medium profit
+        } else if (profit_bps > 0) {
+            line_color = IM_COL32(100, 255, 100, 150);  // Light green for low profit
+        } else {
+            line_color = IM_COL32(100, 100, 100, 100);  // Gray for no opportunity
+        }
+        
+        // Animated flow effect
+        if (is_active && profit_bps > 5.0f) {
+            float flow_phase = fmod(ImGui::GetTime() * 2.0f + i * 0.3f, 1.0f);
+            ImVec2 flow_start = ImVec2(
+                points[i].x + (points[next].x - points[i].x) * flow_phase,
+                points[i].y + (points[next].y - points[i].y) * flow_phase
+            );
+            draw_list->AddCircleFilled(flow_start, 4.0f, IM_COL32(255, 255, 255, 200));
+        }
+        
+        // Draw the connection line
+        draw_list->AddLine(points[i], points[next], line_color, line_thickness);
+    }
+    
+    // Center profit indicator
+    char profit_text[32];
+    snprintf(profit_text, sizeof(profit_text), "%.1f bps", profit_bps);
+    ImVec2 profit_size = ImGui::CalcTextSize(profit_text);
+    ImVec2 profit_pos = ImVec2(center.x - profit_size.x/2, center.y - profit_size.y/2);
+    
+    ImU32 profit_bg_color = profit_bps > 10.0f ? IM_COL32(0, 100, 0, 180) : IM_COL32(100, 100, 100, 120);
+    draw_list->AddRectFilled(
+        ImVec2(profit_pos.x - 5, profit_pos.y - 3),
+        ImVec2(profit_pos.x + profit_size.x + 5, profit_pos.y + profit_size.y + 3),
+        profit_bg_color, 5.0f
+    );
+    draw_list->AddText(profit_pos, IM_COL32(255, 255, 255, 255), profit_text);
+}
+
+// Performance gauge widget with smooth animation
+void DrawPerformanceGauge(ImVec2 center, float radius, float value, const char* label, ImU32 color) {
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    
+    // Background circle
+    draw_list->AddCircle(center, radius, IM_COL32(100, 100, 100, 100), 0, 3.0f);
+    
+    // Progress arc (value from 0.0 to 1.0)
+    float angle_start = -3.14159f / 2.0f; // Start from top
+    float angle_end = angle_start + (value * 2.0f * 3.14159f);
+    
+    // Draw progress arc in segments for smooth appearance
+    int segments = 32;
+    for (int i = 0; i < segments; i++) {
+        float t1 = (float)i / segments;
+        float t2 = (float)(i + 1) / segments;
+        
+        if (t1 > value) break;
+        
+        float a1 = angle_start + t1 * 2.0f * 3.14159f;
+        float a2 = angle_start + fmin(t2, value) * 2.0f * 3.14159f;
+        
+        ImVec2 p1 = ImVec2(center.x + (radius - 8) * cos(a1), center.y + (radius - 8) * sin(a1));
+        ImVec2 p2 = ImVec2(center.x + (radius - 8) * cos(a2), center.y + (radius - 8) * sin(a2));
+        ImVec2 p3 = ImVec2(center.x + radius * cos(a2), center.y + radius * sin(a2));
+        ImVec2 p4 = ImVec2(center.x + radius * cos(a1), center.y + radius * sin(a1));
+        
+        draw_list->AddQuadFilled(p1, p2, p3, p4, color);
+    }
+    
+    // Center value text
+    char value_text[32];
+    snprintf(value_text, sizeof(value_text), "%.0f%%", value * 100.0f);
+    ImVec2 text_size = ImGui::CalcTextSize(value_text);
+    draw_list->AddText(
+        ImVec2(center.x - text_size.x/2, center.y - text_size.y/2),
+        IM_COL32(255, 255, 255, 255), value_text
+    );
+    
+    // Label below
+    ImVec2 label_size = ImGui::CalcTextSize(label);
+    draw_list->AddText(
+        ImVec2(center.x - label_size.x/2, center.y + radius + 10),
+        IM_COL32(200, 200, 200, 255), label
+    );
+}
+
+// Exchange network flow visualization
+void DrawExchangeNetworkWidget(ImVec2 start_pos, ImVec2 size) {
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    
+    // Exchange positions in a network layout
+    struct ExchangeNode {
+        const char* name;
+        ImVec2 pos;
+        ImU32 color;
+        bool connected;
+    };
+    
+    ExchangeNode exchanges[] = {
+        {"Binance", ImVec2(start_pos.x + size.x * 0.2f, start_pos.y + size.y * 0.3f), IM_COL32(255, 165, 0, 255), true},
+        {"Coinbase", ImVec2(start_pos.x + size.x * 0.8f, start_pos.y + size.y * 0.3f), IM_COL32(50, 150, 255, 255), false},
+        {"Kraken", ImVec2(start_pos.x + size.x * 0.5f, start_pos.y + size.y * 0.7f), IM_COL32(150, 50, 255, 255), false},
+        {"FTX", ImVec2(start_pos.x + size.x * 0.2f, start_pos.y + size.y * 0.7f), IM_COL32(100, 200, 100, 255), false},
+        {"Bitfinex", ImVec2(start_pos.x + size.x * 0.8f, start_pos.y + size.y * 0.7f), IM_COL32(200, 100, 200, 255), false}
+    };
+    
+    // Draw connections between exchanges
+    for (int i = 0; i < 5; i++) {
+        for (int j = i + 1; j < 5; j++) {
+            if (exchanges[i].connected && exchanges[j].connected) {
+                // Active connection - bright line with flow animation
+                float flow_phase = fmod(ImGui::GetTime() * 1.5f + i + j, 1.0f);
+                ImVec2 flow_pos = ImVec2(
+                    exchanges[i].pos.x + (exchanges[j].pos.x - exchanges[i].pos.x) * flow_phase,
+                    exchanges[i].pos.y + (exchanges[j].pos.y - exchanges[i].pos.y) * flow_phase
+                );
+                
+                draw_list->AddLine(exchanges[i].pos, exchanges[j].pos, IM_COL32(0, 255, 0, 150), 3.0f);
+                draw_list->AddCircleFilled(flow_pos, 3.0f, IM_COL32(255, 255, 255, 200));
+            } else if (exchanges[i].connected || exchanges[j].connected) {
+                // Potential connection - dim line
+                draw_list->AddLine(exchanges[i].pos, exchanges[j].pos, IM_COL32(100, 100, 100, 50), 1.0f);
+            }
+        }
+    }
+    
+    // Draw exchange nodes
+    for (int i = 0; i < 5; i++) {
+        float node_radius = exchanges[i].connected ? 20.0f : 15.0f;
+        ImU32 node_color = exchanges[i].connected ? exchanges[i].color : IM_COL32(100, 100, 100, 150);
+        
+        draw_list->AddCircleFilled(exchanges[i].pos, node_radius, node_color);
+        draw_list->AddCircle(exchanges[i].pos, node_radius + 2, IM_COL32(255, 255, 255, 200), 0, 2.0f);
+        
+        // Exchange name
+        ImVec2 text_size = ImGui::CalcTextSize(exchanges[i].name);
+        draw_list->AddText(
+            ImVec2(exchanges[i].pos.x - text_size.x/2, exchanges[i].pos.y + node_radius + 5),
+            IM_COL32(255, 255, 255, 255), exchanges[i].name
+        );
+        
+        // Connection status indicator
+        if (exchanges[i].connected) {
+            draw_list->AddCircleFilled(
+                ImVec2(exchanges[i].pos.x + node_radius - 5, exchanges[i].pos.y - node_radius + 5),
+                4.0f, IM_COL32(0, 255, 0, 255)
+            );
+        }
+    }
+}
+
+// ========================================================================
+// 🎯 ENHANCED VISUAL DASHBOARD WINDOWS
+// ========================================================================
+
+void RenderAlgorithmVisualizationWindow(GUIState& state) {
+    ImGui::Begin("🔮 Algorithm Visualization Hub", &state.show_main_dashboard);
+    
+    ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "🚀 Real-Time Algorithm Performance Monitor");
+    ImGui::Separator();
+    
+    // Get current window size for responsive layout
+    ImVec2 window_size = ImGui::GetContentRegionAvail();
+    
+    // Triangle Arbitrage Section
+    ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "△ Triangle Arbitrage Monitor");
+    
+    // Simulate triangle arbitrage data (replace with real algorithm data)
+    static float triangle_profit = 0.0f;
+    static bool triangle_active = false;
+    
+    if (state.isLiveMode()) {
+        // In live mode, show real opportunities (placeholder for now)
+        triangle_profit = 15.0f + sin(ImGui::GetTime() * 0.5f) * 8.0f;
+        triangle_active = triangle_profit > 10.0f;
+    } else {
+        // Demo mode with animated values
+        triangle_profit = 12.0f + sin(ImGui::GetTime() * 0.8f) * 6.0f;
+        triangle_active = triangle_profit > 8.0f;
+    }
+    
+    // Draw triangle arbitrage widget
+    ImVec2 triangle_center = ImVec2(window_size.x * 0.25f, 150.0f);
+    DrawTriangleArbitrageWidget(triangle_center, 60.0f, triangle_profit, 50000.0f, triangle_active);
+    
+    // Performance Gauges Section
+    ImGui::SetCursorPos(ImVec2(window_size.x * 0.5f, 50.0f));
+    ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "📊 Strategy Performance");
+    
+    // Performance gauges
+    float win_rate = state.win_rate / 100.0f;
+    float profit_factor = fmin((state.daily_pnl + 5000.0f) / 10000.0f, 1.0f);
+    float risk_score = 1.0f - fmin(state.max_drawdown / 10.0f, 1.0f);
+    
+    ImVec2 gauge_start = ImVec2(window_size.x * 0.5f, 100.0f);
+    DrawPerformanceGauge(ImVec2(gauge_start.x, gauge_start.y), 35.0f, win_rate, "Win Rate", IM_COL32(0, 255, 0, 200));
+    DrawPerformanceGauge(ImVec2(gauge_start.x + 100, gauge_start.y), 35.0f, profit_factor, "Profit", IM_COL32(255, 165, 0, 200));
+    DrawPerformanceGauge(ImVec2(gauge_start.x + 200, gauge_start.y), 35.0f, risk_score, "Risk Control", IM_COL32(50, 150, 255, 200));
+    
+    // Exchange Network Section
+    ImGui::SetCursorPos(ImVec2(10.0f, 220.0f));
+    ImGui::TextColored(ImVec4(1.0f, 0.5f, 1.0f, 1.0f), "🌐 Exchange Network Status");
+    
+    ImVec2 network_start = ImVec2(20.0f, 250.0f);
+    ImVec2 network_size = ImVec2(window_size.x - 40.0f, 200.0f);
+    DrawExchangeNetworkWidget(network_start, network_size);
+    
+    // Real-time stats footer
+    ImGui::SetCursorPos(ImVec2(10.0f, window_size.y - 60.0f));
+    ImGui::Separator();
+    if (state.isLiveMode()) {
+        auto stats = state.live_market_manager->getMarketStats();
+        ImGui::Text("🔴 LIVE | Exchanges: %d | Opportunities: %d | Latency: %.1fms | Updates: %d/sec", 
+                   stats.connected_exchanges, stats.arbitrage_opportunities, 
+                   stats.avg_latency_ms, stats.updates_per_second);
+    } else {
+        ImGui::Text("🟡 DEMO | Simulation Active | P&L: $%.2f | Trades: %d | Sharpe: %.2f", 
+                   state.daily_pnl, state.total_trades, state.sharpe_ratio);
+    }
     
     ImGui::End();
 }

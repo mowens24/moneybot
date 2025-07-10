@@ -1,7 +1,52 @@
 #include "live_trading_manager.h"
 #include "binance_exchange.h"
+#include <imgui.h>
 #include <iostream>
 #include <chrono>
+#include <cmath>
+
+// Algorithm Visualization Data Structures
+struct TriangleArbOpportunity {
+    std::string symbol_a, symbol_b, symbol_c;  // e.g., BTC, ETH, USDT
+    std::string exchange_1, exchange_2, exchange_3;
+    double profit_bps = 0.0;
+    double volume_usd = 0.0;
+    double execution_probability = 0.0;
+    bool is_active = false;
+    std::chrono::steady_clock::time_point last_update;
+    
+    // Visual properties for animation
+    float visual_intensity = 0.0f;  // 0.0 to 1.0 for line thickness/color
+    float animation_phase = 0.0f;   // For pulsing/flowing animations
+};
+
+struct ExchangeFlowData {
+    std::string from_exchange, to_exchange;
+    double flow_volume_24h = 0.0;
+    double avg_profit_bps = 0.0;
+    int opportunities_count = 0;
+    bool is_flowing = false;
+    
+    // Visual animation properties
+    float flow_particles = 0.0f;    // Number of animated particles
+    float flow_speed = 1.0f;        // Speed of flow animation
+    ImVec4 flow_color = ImVec4(0.0f, 1.0f, 0.0f, 1.0f); // Green for profit
+};
+
+struct AlgorithmPerformance {
+    std::string algo_name;
+    double daily_pnl = 0.0;
+    double total_pnl = 0.0;
+    double win_rate = 0.0;           // 0.0 to 1.0
+    double sharpe_ratio = 0.0;
+    int trades_executed = 0;
+    bool is_active = true;
+    
+    // Visual gauge properties
+    float gauge_value = 0.0f;        // Current performance gauge (0.0 to 1.0)
+    float target_gauge = 0.0f;       // Target for smooth animation
+    ImVec4 performance_color = ImVec4(0.0f, 1.0f, 0.0f, 1.0f);
+};
 
 // LiveMarketDataManager Implementation
 LiveMarketDataManager::LiveMarketDataManager(bool demo) 
