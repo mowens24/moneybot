@@ -1,17 +1,17 @@
 #pragma once
 
+#include "base_window.h"
+#include "risk_manager.h"
+#include "core/portfolio_manager.h"
 #include <memory>
 #include <vector>
 #include <string>
 #include <map>
+#include <chrono>
 #include <imgui.h>
 
 namespace moneybot {
-
-// Forward declarations
-class RiskManager;
 class PortfolioManager;
-
 namespace gui {
 
 struct RiskMetrics {
@@ -42,7 +42,7 @@ struct RiskAlert {
     bool acknowledged = false;
 };
 
-class RiskWindow {
+class RiskWindow : public BaseWindow {
 private:
     std::shared_ptr<RiskManager> risk_manager_;
     std::shared_ptr<PortfolioManager> portfolio_manager_;
@@ -70,9 +70,9 @@ private:
 public:
     RiskWindow(std::shared_ptr<RiskManager> risk_manager, 
                std::shared_ptr<PortfolioManager> portfolio_manager);
-    ~RiskWindow() = default;
+    ~RiskWindow() override = default;
     
-    void render();
+    void render() override;
     void updateData();
     
     // Alert management

@@ -11,8 +11,6 @@ namespace moneybot {
 
 // Forward declarations
 class ExchangeManager;
-struct MarketData;
-struct TickData;
 
 namespace gui {
 
@@ -57,10 +55,6 @@ public:
     
     void render();
     void updateData();
-    
-    // Data update callbacks
-    void onMarketData(const MarketData& data);
-    void onTickData(const TickData& tick);
     
 private:
     void renderPriceTable();

@@ -19,6 +19,7 @@ using json = nlohmann::json;
 
 // Forward declare GUI main function
 int gui_main(int argc, char** argv);
+int gui_main_new(int argc, char** argv);
 
 std::atomic<bool> running(true);
 
@@ -118,7 +119,7 @@ int main(int argc, char* argv[]) {
         LOG_INFO("Starting GUI mode");
         state_manager.setTradingMode(use_simulator ? moneybot::TradingMode::DEMO : 
                                     (dry_run ? moneybot::TradingMode::PAPER : moneybot::TradingMode::LIVE));
-        return gui_main(argc, argv);
+        return gui_main_new(argc, argv);
     }
 
     // Initialize configuration manager

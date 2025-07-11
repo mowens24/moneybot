@@ -98,7 +98,15 @@ add_executable(moneybot
     src/core/exchange_manager.cpp
     src/core/portfolio_manager.cpp
     src/core/strategy_controller.cpp
-    src/gui/main_window.cpp
+    # GUI components
+    src/gui/base_window.cpp
+    src/gui/main_window_simple.cpp
+    src/gui/portfolio_window.cpp
+    src/gui/market_data_window.cpp
+    src/gui/algorithm_window.cpp
+    src/gui/risk_window.cpp
+    src/gui/exchange_window.cpp
+    src/gui_main_new.cpp
     # Strategy engine and strategies
     src/strategy/strategy_engine.cpp
     src/strategy/triangle_arbitrage_strategy.cpp

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "base_window.h"
+#include "core/exchange_manager.h"
 #include <memory>
 #include <vector>
 #include <string>
@@ -8,10 +10,6 @@
 #include <imgui.h>
 
 namespace moneybot {
-
-// Forward declarations
-class ExchangeManager;
-
 namespace gui {
 
 struct ExchangeStatus {
@@ -36,7 +34,7 @@ struct ExchangeMetrics {
     double uptime_pct = 0.0;
 };
 
-class ExchangeWindow {
+class ExchangeWindow : public BaseWindow {
 private:
     std::shared_ptr<ExchangeManager> exchange_manager_;
     
@@ -65,9 +63,9 @@ private:
     
 public:
     explicit ExchangeWindow(std::shared_ptr<ExchangeManager> exchange_manager);
-    ~ExchangeWindow() = default;
+    ~ExchangeWindow() override = default;
     
-    void render();
+    void render() override;
     void updateData();
     
     // Connection management

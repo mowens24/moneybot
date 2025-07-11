@@ -4,13 +4,12 @@
 #include <vector>
 #include <string>
 #include <imgui.h>
+#include "types.h"  // Include types to have Position and Balance
 
 namespace moneybot {
 
 // Forward declarations
 class PortfolioManager;
-class Position;
-class Balance;
 
 namespace gui {
 
