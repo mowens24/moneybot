@@ -1,5 +1,5 @@
 #pragma once
-#include "strategy.h"
+#include "legacy_strategy.h"
 #include "multi_exchange_gateway.h"
 #include <deque>
 #include <memory>

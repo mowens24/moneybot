@@ -5,9 +5,16 @@
 namespace moneybot {
     Logger::Logger() {
         try {
-            logger_ = spdlog::rotating_logger_mt("moneybot", "logs/moneybot.log", 1024 * 1024 * 5, 3);
-            logger_->set_level(spdlog::level::info);
-            logger_->info("Logger initialized.");
+            // Check if logger already exists
+            auto existing_logger = spdlog::get("moneybot");
+            if (existing_logger) {
+                logger_ = existing_logger;
+                logger_->info("Logger reused from existing instance.");
+            } else {
+                logger_ = spdlog::rotating_logger_mt("moneybot", "logs/moneybot.log", 1024 * 1024 * 5, 3);
+                logger_->set_level(spdlog::level::info);
+                logger_->info("Logger initialized.");
+            }
         } catch (const spdlog::spdlog_ex& ex) {
             std::cerr << "Logger initialization failed: " << ex.what() << std::endl;
         }

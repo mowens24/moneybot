@@ -15,10 +15,25 @@ RiskLimits::RiskLimits(const nlohmann::json& j) {
 }
 
 RiskManager::RiskManager(std::shared_ptr<Logger> logger, const nlohmann::json& config)
-    : logger_(logger), limits_(config["risk"]), total_realized_pnl_(0.0), 
+    : logger_(logger), total_realized_pnl_(0.0), 
       peak_equity_(0.0), current_equity_(0.0), emergency_stopped_(false),
       session_start_(std::chrono::system_clock::now()),
       last_pnl_update_(std::chrono::system_clock::now()) {
+    
+    // Initialize limits with defaults or from config
+    if (config.contains("risk")) {
+        limits_ = RiskLimits(config["risk"]);
+    } else {
+        // Use default limits
+        limits_.max_position_size = 1.0;
+        limits_.max_order_size = 0.1;
+        limits_.max_daily_loss = 1000.0;
+        limits_.max_drawdown = 0.1;
+        limits_.max_orders_per_minute = 10;
+        limits_.min_spread = 0.001;
+        limits_.max_slippage = 0.01;
+    }
+    
     logger_->getLogger()->info("RiskManager initialized with limits: max_position={}, max_order={}, max_daily_loss={}",
                               limits_.max_position_size, limits_.max_order_size, limits_.max_daily_loss);
 }

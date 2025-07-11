@@ -7,7 +7,7 @@
 #include "logger.h"
 #include "network.h"
 #include "order_book.h"
-#include "strategy.h"
+#include "legacy_strategy.h"
 #include "order_manager.h"
 #include "risk_manager.h"
 #include "market_maker_strategy.h"

@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 #include <memory>
-#include "strategy.h"
+#include "legacy_strategy.h"
 #include "order_book.h"
 
 namespace moneybot {

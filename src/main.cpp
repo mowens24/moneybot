@@ -1,10 +1,13 @@
-#include "moneybot.h"
 #include "logger.h"
+#include "modern_logger.h"
+#include "application_state.h"
+#include "event_manager.h"
 #include "data_analyzer.h"
 #include "backtest_engine.h"
 #include "strategy_factory.h"
 #include "config_manager.h"
 #include "market_data_simulator.h"
+#include "core/strategy_controller.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <iostream>
@@ -20,7 +23,15 @@ int gui_main(int argc, char** argv);
 std::atomic<bool> running(true);
 
 void signalHandler(int signum) {
-    std::cout << "\nReceived signal " << signum << ". Shutting down gracefully..." << std::endl;
+    LOG_INFO("Received signal. Initiating graceful shutdown...");
+    
+    auto& state_manager = moneybot::ApplicationStateManager::getInstance();
+    state_manager.requestShutdown();
+    state_manager.setState(moneybot::AppState::DISCONNECTING);
+    
+    auto& event_manager = moneybot::EventManager::getInstance();
+    event_manager.stop();
+    
     running = false;
 }
 
@@ -39,6 +50,21 @@ void printUsage(const char* program) {
 }
 
 int main(int argc, char* argv[]) {
+    // Initialize application state
+    auto& state_manager = moneybot::ApplicationStateManager::getInstance();
+    state_manager.setState(moneybot::AppState::INITIALIZING);
+    
+    // Initialize logging first
+    auto& logger = moneybot::ModernLogger::getInstance();
+    logger.initialize("info", "logs/moneybot.log");
+    
+    LOG_INFO("MoneyBot starting up...");
+    
+    // Initialize event system
+    auto& event_manager = moneybot::EventManager::getInstance();
+    event_manager.start();
+    
+    // Set up signal handlers
     signal(SIGINT, signalHandler);
     signal(SIGTERM, signalHandler);
     
@@ -89,14 +115,18 @@ int main(int argc, char* argv[]) {
 
     // Default to GUI mode unless console mode is explicitly requested
     if (!console_mode && !analyze_mode && !backtest_mode) {
-        std::cout << "Starting MoneyBot GUI Dashboard..." << std::endl;
+        LOG_INFO("Starting GUI mode");
+        state_manager.setTradingMode(use_simulator ? moneybot::TradingMode::DEMO : 
+                                    (dry_run ? moneybot::TradingMode::PAPER : moneybot::TradingMode::LIVE));
         return gui_main(argc, argv);
     }
 
     // Initialize configuration manager
     auto& config_manager = moneybot::ConfigManager::getInstance();
     if (!config_manager.loadConfig(config_file)) {
-        std::cerr << "Error: Failed to load configuration from: " << config_file << std::endl;
+        LOG_ERROR("Failed to load configuration from: " + config_file);
+        state_manager.setError("Configuration load failed");
+        state_manager.setState(moneybot::AppState::ERROR);
         return 1;
     }
 
@@ -104,16 +134,23 @@ int main(int argc, char* argv[]) {
 
     // Validate API keys if not in dry-run mode
     if (!config_manager.isDryRunMode() && !config_manager.validateApiKeys()) {
-        std::cerr << "Error: Invalid or missing API keys. Check environment variables." << std::endl;
-        std::cerr << "Run './setup_env.sh' to set up API keys, then 'source load_env.sh'" << std::endl;
+        LOG_ERROR("Invalid or missing API keys. Check environment variables.");
+        LOG_INFO("Run './setup_env.sh' to set up API keys, then 'source load_env.sh'");
+        state_manager.setError("API keys validation failed");
+        state_manager.setState(moneybot::AppState::ERROR);
         return 1;
     }
 
-    // Set dry-run mode if requested via command line
+    // Set trading mode
     if (dry_run) {
-        config["dry_run"] = true;
-        config["exchange"]["rest_api"]["secret_key"] = "dry_run_mode";
-        std::cout << "Running in DRY-RUN mode (no real orders will be placed)" << std::endl;
+        state_manager.setTradingMode(moneybot::TradingMode::PAPER);
+        LOG_INFO("Running in PAPER TRADING mode (no real orders will be placed)");
+    } else if (use_simulator) {
+        state_manager.setTradingMode(moneybot::TradingMode::DEMO);
+        LOG_INFO("Running in DEMO mode with simulated data");
+    } else {
+        state_manager.setTradingMode(moneybot::TradingMode::LIVE);
+        LOG_WARN("Running in LIVE TRADING mode - REAL MONEY AT RISK!");
     }
 
     if (analyze_mode) {
@@ -147,7 +184,10 @@ int main(int argc, char* argv[]) {
 
     std::cout << "=== MoneyBot HFT Trading System ===" << std::endl;
     
-    if (multi_asset_mode || config["strategy"]["type"].get<std::string>() == "multi_asset") {
+    // Initialize StrategyController
+    auto strategy_controller = std::make_unique<moneybot::StrategyController>();
+    
+    if (multi_asset_mode || (config.contains("strategy") && config["strategy"].contains("type") && config["strategy"]["type"].get<std::string>() == "multi_asset")) {
         std::cout << "🚀 MULTI-ASSET TRADING MODE" << std::endl;
         std::cout << "Strategy: Multi-Asset Goldman Sachs Level" << std::endl;
         std::cout << "Exchanges: ";
@@ -173,6 +213,16 @@ int main(int argc, char* argv[]) {
         std::cout << "Symbol: " << config["strategy"]["symbol"].get<std::string>() << std::endl;
         std::cout << "Exchange: " << config["exchange"]["rest_api"]["base_url"].get<std::string>() << std::endl;
     }
+    
+    // Initialize and start strategy controller
+    std::cout << "🧠 Initializing Strategy Controller..." << std::endl;
+    if (!strategy_controller->initialize(config)) {
+        std::cerr << "❌ Failed to initialize StrategyController" << std::endl;
+        return 1;
+    }
+    
+    strategy_controller->start();
+    std::cout << "✅ Strategy Controller started successfully" << std::endl;
     
     std::cout << "Press Ctrl+C to stop" << std::endl;
 
@@ -221,43 +271,46 @@ int main(int argc, char* argv[]) {
             std::cout << "⚠️  Live data not yet implemented. Use --simulator for demo mode." << std::endl;
         }
 
-        moneybot::TradingEngine engine(config);
-        engine.start();
-        
         // Main loop - periodic status updates only
         while (running) {
             std::this_thread::sleep_for(std::chrono::seconds(10));
             
-            // Get live metrics
-            auto metrics = engine.getPerformanceMetrics();
-            auto status = engine.getStatus();
-            int64_t uptime = status["uptime_seconds"].get<int64_t>();
-            double pnl = metrics["total_pnl"].get<double>();
-            int trades = metrics["total_trades"].get<int>();
-            double avg_pnl = metrics["avg_pnl_per_trade"].get<double>();
-            
-            // Connection status
-            std::string ws_status = engine.isWsConnected() ? "🟢 Connected" : "🔴 Disconnected";
+            // Get performance metrics from StrategyController
+            auto metrics = strategy_controller->getPerformanceMetrics();
             
             // Print status every 10 seconds
             std::cout << "=== Status Update ===" << std::endl;
-            std::cout << "Connection: " << ws_status << std::endl;
-            std::cout << "Running: " << (status["running"].get<bool>() ? "Yes" : "No") << std::endl;
-            std::cout << "Uptime: " << uptime << " seconds" << std::endl;
-            std::cout << "Total PnL: $" << std::fixed << std::setprecision(2) << pnl << std::endl;
-            std::cout << "Total Trades: " << trades << std::endl;
-            std::cout << "Avg PnL per Trade: $" << std::fixed << std::setprecision(2) << avg_pnl << std::endl;
+            std::cout << "Running: " << (strategy_controller->isRunning() ? "Yes" : "No") << std::endl;
+            std::cout << "Emergency Stop: " << (strategy_controller->isEmergencyStopped() ? "Yes" : "No") << std::endl;
+            std::cout << "Total Portfolio Value: $" << std::fixed << std::setprecision(2) << metrics.total_portfolio_value << std::endl;
+            std::cout << "Total PnL: $" << std::fixed << std::setprecision(2) << metrics.total_pnl << std::endl;
+            std::cout << "Daily PnL: $" << std::fixed << std::setprecision(2) << metrics.daily_pnl << std::endl;
+            std::cout << "Total Trades: " << metrics.total_trades << std::endl;
+            std::cout << "Overall Win Rate: " << std::fixed << std::setprecision(1) << metrics.overall_win_rate << "%" << std::endl;
+            std::cout << "Overall Sharpe Ratio: " << std::fixed << std::setprecision(2) << metrics.overall_sharpe_ratio << std::endl;
+            std::cout << "Max Drawdown: " << std::fixed << std::setprecision(2) << metrics.max_drawdown << "%" << std::endl;
+            std::cout << "VaR (95%): $" << std::fixed << std::setprecision(2) << metrics.var_95 << std::endl;
             
-            // Order book info
-            double bid = engine.getBestBid();
-            double ask = engine.getBestAsk();
-            double spread = ask > 0 && bid > 0 ? ask - bid : 0.0;
-            std::cout << "Best Bid: " << bid << " | Best Ask: " << ask << " | Spread: " << spread << std::endl;
-            
-            if (status.contains("risk")) {
-                auto risk = status["risk"];
-                std::cout << "Emergency Stop: " << (risk["emergency_stopped"].get<bool>() ? "Yes" : "No") << std::endl;
-                std::cout << "Drawdown: " << std::fixed << std::setprecision(2) << risk["drawdown"].get<double>() << "%" << std::endl;
+            // Strategy details
+            if (!metrics.strategy_statuses.empty()) {
+                std::cout << "Active Strategies:" << std::endl;
+                for (const auto& status : metrics.strategy_statuses) {
+                    std::cout << "  - " << status.name << " (" << status.type << "): ";
+                    if (status.is_active) {
+                        std::cout << "🟢 ACTIVE | ";
+                    } else if (status.is_enabled) {
+                        std::cout << "🟡 ENABLED | ";
+                    } else {
+                        std::cout << "🔴 DISABLED | ";
+                    }
+                    std::cout << "PnL: $" << std::fixed << std::setprecision(2) << status.total_pnl;
+                    std::cout << " | Trades: " << status.total_trades;
+                    std::cout << " | Win Rate: " << std::fixed << std::setprecision(1) << status.win_rate << "%";
+                    if (!status.last_error.empty()) {
+                        std::cout << " | Error: " << status.last_error;
+                    }
+                    std::cout << std::endl;
+                }
             }
             
             // Show live market data if simulator is running
@@ -274,19 +327,23 @@ int main(int argc, char* argv[]) {
         }
         std::cout << "\nShutting down..." << std::endl;
         
-        // Stop simulator first
+        // Stop strategy controller
+        strategy_controller->stop();
+        
+        // Stop simulator
         if (simulator) {
             simulator->stop();
         }
         
-        engine.stop();
-        
         // Final status report
-        auto final_metrics = engine.getPerformanceMetrics();
+        auto final_metrics = strategy_controller->getPerformanceMetrics();
         std::cout << "\n=== Final Report ===" << std::endl;
-        std::cout << "Total PnL: $" << std::fixed << std::setprecision(2) << final_metrics["total_pnl"].get<double>() << std::endl;
-        std::cout << "Total Trades: " << final_metrics["total_trades"].get<int>() << std::endl;
-        std::cout << "Avg PnL per Trade: $" << std::fixed << std::setprecision(2) << final_metrics["avg_pnl_per_trade"].get<double>() << std::endl;
+        std::cout << "Total Portfolio Value: $" << std::fixed << std::setprecision(2) << final_metrics.total_portfolio_value << std::endl;
+        std::cout << "Total PnL: $" << std::fixed << std::setprecision(2) << final_metrics.total_pnl << std::endl;
+        std::cout << "Daily PnL: $" << std::fixed << std::setprecision(2) << final_metrics.daily_pnl << std::endl;
+        std::cout << "Total Trades: " << final_metrics.total_trades << std::endl;
+        std::cout << "Overall Win Rate: " << std::fixed << std::setprecision(1) << final_metrics.overall_win_rate << "%" << std::endl;
+        std::cout << "Overall Sharpe Ratio: " << std::fixed << std::setprecision(2) << final_metrics.overall_sharpe_ratio << std::endl;
         
     } catch (const std::exception& e) {
         std::cerr << "Fatal error: " << e.what() << std::endl;

@@ -75,6 +75,9 @@ add_executable(moneybot
     src/network.cpp
     src/order_book.cpp
     src/logger.cpp
+    src/modern_logger.cpp
+    src/application_state.cpp
+    src/event_manager.cpp
     src/data_analyzer.cpp
     src/types.cpp
     src/risk_manager.cpp
@@ -91,6 +94,17 @@ add_executable(moneybot
     src/dashboard_metrics_widget.cpp
     src/dashboard_orderbook_widget.cpp
     src/advanced_orderbook_widget.cpp
+    # New core components
+    src/core/exchange_manager.cpp
+    src/core/portfolio_manager.cpp
+    src/core/strategy_controller.cpp
+    src/gui/main_window.cpp
+    # Strategy engine and strategies
+    src/strategy/strategy_engine.cpp
+    src/strategy/triangle_arbitrage_strategy.cpp
+    src/strategy/cross_exchange_arbitrage_strategy.cpp
+    # Testing components
+    src/testing/mock_exchange.cpp
     # ImGui core files
     lib/imgui/imgui.cpp
     lib/imgui/imgui_demo.cpp
@@ -100,6 +114,21 @@ add_executable(moneybot
     # ImGui backends for GLFW and OpenGL3
     lib/imgui/backends/imgui_impl_glfw.cpp
     lib/imgui/backends/imgui_impl_opengl3.cpp
+)
+
+# Test executables
+add_executable(test_portfolio_manager
+    tests/test_portfolio_manager.cpp
+    src/core/portfolio_manager.cpp
+    src/logger.cpp
+    src/types.cpp
+)
+
+add_executable(test_risk_manager
+    tests/test_risk_manager.cpp
+    src/risk_manager.cpp
+    src/logger.cpp
+    src/types.cpp
 )
 
 # --- Workaround for missing pty.h on macOS ---
@@ -128,6 +157,17 @@ if(APPLE)
         "-framework CoreVideo"
         "/opt/homebrew/lib/libglfw.dylib"
     )
+    
+    # Test executables
+    target_link_libraries(test_portfolio_manager
+        ${Boost_LIBRARIES}
+        spdlog::spdlog
+    )
+    
+    target_link_libraries(test_risk_manager
+        ${Boost_LIBRARIES}
+        spdlog::spdlog
+    )
 else()
     target_link_libraries(moneybot
         ${Boost_LIBRARIES}
@@ -137,6 +177,17 @@ else()
         spdlog::spdlog
         ${OPENGL_LIBRARIES}
         ${GLFW_LIBRARIES}
+    )
+    
+    # Test executables
+    target_link_libraries(test_portfolio_manager
+        ${Boost_LIBRARIES}
+        spdlog::spdlog
+    )
+    
+    target_link_libraries(test_risk_manager
+        ${Boost_LIBRARIES}
+        spdlog::spdlog
     )
 endif()
 

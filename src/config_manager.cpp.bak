@@ -1,8 +1,14 @@
 #include "config_manager.h"
+#include "modern_logger.h"
 #include <fstream>
 #include <cstdlib>
 #include <algorithm>
 #include <iostream>
+#include <sstream>
+#include <sys/stat.h>
+#include <chrono>
+#include <thread>
+#include <spdlog/fmt/fmt.h>
 
 namespace moneybot {
 
@@ -16,14 +22,23 @@ ConfigManager::~ConfigManager() {
 }
 
 bool ConfigManager::loadConfig(const std::string& config_path) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
     try {
         std::ifstream config_file(config_path);
         if (!config_file.is_open()) {
-            std::cerr << "ERROR: Failed to open config file: " << config_path << std::endl;
+            LOG_ERROR_FMT("Failed to open config file: {}", config_path);
             return false;
         }
 
         config_file >> config_;
+        config_file_path_ = config_path;
+        
+        // Get file modification time for hot-reload
+        struct stat file_stat;
+        if (stat(config_path.c_str(), &file_stat) == 0) {
+            last_modified_time_ = file_stat.st_mtime;
+        }
         
         // Load API keys from environment variables
         loadApiKeysFromEnv();
@@ -37,13 +52,13 @@ bool ConfigManager::loadConfig(const std::string& config_path) {
             config_["dry_run"] = dry_run_mode_;
         }
         
-        std::cout << "INFO: Configuration loaded successfully" << std::endl;
-        std::cout << "INFO: Production mode: " << (production_mode_ ? "true" : "false") << std::endl;
-        std::cout << "INFO: Dry run mode: " << (dry_run_mode_ ? "true" : "false") << std::endl;
+        LOG_INFO("Configuration loaded successfully");
+        LOG_INFO_FMT("Production mode: {}", production_mode_ ? "true" : "false");
+        LOG_INFO_FMT("Dry run mode: {}", dry_run_mode_ ? "true" : "false");
         
         return true;
     } catch (const std::exception& e) {
-        std::cerr << "ERROR: Failed to load config: " << e.what() << std::endl;
+        LOG_ERROR_FMT("Failed to load config: {}", e.what());
         return false;
     }
 }
@@ -55,7 +70,7 @@ void ConfigManager::loadApiKeysFromEnv() {
     if (!binance_key.empty() && !binance_secret.empty()) {
         api_keys_["binance_api_key"] = binance_key;
         api_keys_["binance_secret_key"] = binance_secret;
-        std::cout << "INFO: Binance API keys loaded from environment" << std::endl;
+        LOG_INFO("Binance API keys loaded from environment");
     }
     
     // Coinbase keys
@@ -66,7 +81,7 @@ void ConfigManager::loadApiKeysFromEnv() {
         api_keys_["coinbase_api_key"] = coinbase_key;
         api_keys_["coinbase_secret_key"] = coinbase_secret;
         api_keys_["coinbase_passphrase"] = coinbase_passphrase;
-        std::cout << "INFO: Coinbase API keys loaded from environment" << std::endl;
+        LOG_INFO("Coinbase API keys loaded from environment");
     }
     
     // Kraken keys
@@ -75,11 +90,13 @@ void ConfigManager::loadApiKeysFromEnv() {
     if (!kraken_key.empty() && !kraken_secret.empty()) {
         api_keys_["kraken_api_key"] = kraken_key;
         api_keys_["kraken_secret_key"] = kraken_secret;
-        std::cout << "INFO: Kraken API keys loaded from environment" << std::endl;
+        LOG_INFO("Kraken API keys loaded from environment");
     }
 }
 
 nlohmann::json ConfigManager::getExchangeConfig(const std::string& exchange_name) const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
     if (!config_.contains("multi_asset") || !config_["multi_asset"].contains("exchanges")) {
         return nlohmann::json{};
     }
@@ -118,8 +135,10 @@ nlohmann::json ConfigManager::getExchangeConfig(const std::string& exchange_name
 }
 
 bool ConfigManager::validateApiKeys() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
     if (dry_run_mode_) {
-        std::cout << "INFO: Dry run mode - API key validation skipped" << std::endl;
+        LOG_INFO("Dry run mode - API key validation skipped");
         return true;
     }
     
@@ -135,20 +154,20 @@ bool ConfigManager::validateApiKeys() const {
                 auto secret_key_it = api_keys_.find(name + "_secret_key");
                 
                 if (api_key_it == api_keys_.end() || secret_key_it == api_keys_.end()) {
-                    std::cerr << "ERROR: Missing API keys for enabled exchange: " << name << std::endl;
+                    LOG_ERROR("Missing API keys for enabled exchange: {}", name);
                     all_valid = false;
                 } else if (api_key_it->second.empty() || secret_key_it->second.empty()) {
-                    std::cerr << "ERROR: Empty API keys for enabled exchange: " << name << std::endl;
+                    LOG_ERROR("Empty API keys for enabled exchange: {}", name);
                     all_valid = false;
                 } else {
-                    std::cout << "INFO: API keys validated for exchange: " << name << std::endl;
+                    LOG_INFO("API keys validated for exchange: {}", name);
                 }
                 
                 // Special validation for Coinbase
                 if (name == "coinbase") {
                     auto passphrase_it = api_keys_.find("coinbase_passphrase");
                     if (passphrase_it == api_keys_.end() || passphrase_it->second.empty()) {
-                        std::cerr << "ERROR: Missing passphrase for Coinbase" << std::endl;
+                        LOG_ERROR("Missing passphrase for Coinbase");
                         all_valid = false;
                     }
                 }
@@ -179,7 +198,7 @@ bool ConfigManager::validateExchangeConfig(const nlohmann::json& exchange_config
     
     for (const auto& field : required_fields) {
         if (!exchange_config.contains(field)) {
-            std::cerr << "ERROR: Missing required field in exchange config: " << field << std::endl;
+            LOG_ERROR("Missing required field in exchange config: {}", field);
             return false;
         }
     }
@@ -188,30 +207,36 @@ bool ConfigManager::validateExchangeConfig(const nlohmann::json& exchange_config
 }
 
 bool ConfigManager::saveConfig(const std::string& config_path) const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
     try {
         std::string path = config_path.empty() ? config_file_path_ : config_path;
         if (path.empty()) {
-            std::cerr << "ERROR: No config file path specified for saving" << std::endl;
+            LOG_ERROR("No config file path specified for saving");
             return false;
         }
         
         std::ofstream config_file(path);
         if (!config_file.is_open()) {
-            std::cerr << "ERROR: Failed to open config file for writing: " << path << std::endl;
+            LOG_ERROR("Failed to open config file for writing: {}", path);
             return false;
         }
         
         config_file << config_.dump(4);
-        std::cout << "INFO: Configuration saved successfully to: " << path << std::endl;
+        LOG_INFO("Configuration saved successfully to: {}", path);
         return true;
     } catch (const std::exception& e) {
-        std::cerr << "ERROR: Failed to save config: " << e.what() << std::endl;
+        LOG_ERROR("Failed to save config: {}", e.what());
         return false;
     }
 }
 
 std::string ConfigManager::getNestedValue(const std::string& nested_key, const std::string& default_value) const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
     try {
+        nlohmann::json::json_pointer ptr("/" + nested_key);
+        // Replace dots with slashes for JSON pointer
         std::string json_ptr = "/" + nested_key;
         std::replace(json_ptr.begin(), json_ptr.end(), '.', '/');
         
@@ -222,33 +247,41 @@ std::string ConfigManager::getNestedValue(const std::string& nested_key, const s
             return result.dump();
         }
     } catch (const std::exception& e) {
+        LOG_DEBUG("Failed to get nested value '{}': {}", nested_key, e.what());
         return default_value;
     }
 }
 
 void ConfigManager::setNestedValue(const std::string& nested_key, const std::string& value) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
     try {
         std::string json_ptr = "/" + nested_key;
         std::replace(json_ptr.begin(), json_ptr.end(), '.', '/');
         
         config_[nlohmann::json::json_pointer(json_ptr)] = value;
+        LOG_DEBUG("Set nested value '{}' = '{}'", nested_key, value);
     } catch (const std::exception& e) {
-        std::cerr << "ERROR: Failed to set nested value '" << nested_key << "': " << e.what() << std::endl;
+        LOG_ERROR("Failed to set nested value '{}': {}", nested_key, e.what());
     }
 }
 
 void ConfigManager::setDryRunMode(bool dry_run) {
+    std::lock_guard<std::mutex> lock(mutex_);
     dry_run_mode_ = dry_run;
     config_["dry_run"] = dry_run;
-    std::cout << "INFO: Dry run mode set to: " << (dry_run ? "true" : "false") << std::endl;
+    LOG_INFO("Dry run mode set to: {}", dry_run ? "true" : "false");
 }
 
 void ConfigManager::setProductionMode(bool production) {
+    std::lock_guard<std::mutex> lock(mutex_);
     production_mode_ = production;
-    std::cout << "INFO: Production mode set to: " << (production ? "true" : "false") << std::endl;
+    LOG_INFO("Production mode set to: {}", production ? "true" : "false");
 }
 
 bool ConfigManager::validateConfiguration() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
     bool valid = true;
     
     // Check for required top-level fields
@@ -258,7 +291,7 @@ bool ConfigManager::validateConfiguration() const {
     
     for (const auto& field : required_fields) {
         if (!config_.contains(field)) {
-            std::cerr << "ERROR: Missing required configuration field: " << field << std::endl;
+            LOG_ERROR("Missing required configuration field: {}", field);
             valid = false;
         }
     }
@@ -272,12 +305,25 @@ bool ConfigManager::validateConfiguration() const {
         }
     }
     
+    // Validate risk management settings
+    if (config_.contains("risk_management")) {
+        const auto& risk_config = config_["risk_management"];
+        if (!risk_config.contains("max_position_size") || 
+            !risk_config.contains("max_daily_loss") ||
+            !risk_config.contains("max_drawdown")) {
+            LOG_ERROR("Missing required risk management settings");
+            valid = false;
+        }
+    }
+    
     return valid;
 }
 
 std::vector<std::string> ConfigManager::getValidationErrors() const {
     std::vector<std::string> errors;
     
+    // This is a simplified version - in a production system,
+    // you'd want to collect all validation errors instead of just checking validity
     if (!validateConfiguration()) {
         errors.push_back("Configuration validation failed");
     }
@@ -290,17 +336,79 @@ std::vector<std::string> ConfigManager::getValidationErrors() const {
 }
 
 void ConfigManager::enableHotReload(const std::string& config_path) {
-    // Simple stub - hot reload would require file monitoring
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    if (hot_reload_enabled_) {
+        LOG_WARN("Hot reload already enabled");
+        return;
+    }
+    
     config_file_path_ = config_path;
-    std::cout << "INFO: Hot reload enabled for config file: " << config_path << std::endl;
+    hot_reload_enabled_ = true;
+    watch_running_ = true;
+    
+    watch_thread_ = std::thread(&ConfigManager::watchConfigFile, this);
+    LOG_INFO("Hot reload enabled for config file: {}", config_path);
 }
 
 void ConfigManager::disableHotReload() {
-    std::cout << "INFO: Hot reload disabled" << std::endl;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (!hot_reload_enabled_) {
+            return;
+        }
+        
+        hot_reload_enabled_ = false;
+        watch_running_ = false;
+    }
+    
+    if (watch_thread_.joinable()) {
+        watch_thread_.join();
+    }
+    
+    LOG_INFO("Hot reload disabled");
 }
 
 bool ConfigManager::isHotReloadEnabled() const {
-    return false; // Simple stub
+    std::lock_guard<std::mutex> lock(mutex_);
+    return hot_reload_enabled_;
+}
+
+void ConfigManager::watchConfigFile() {
+    while (watch_running_) {
+        if (checkConfigFileChanged()) {
+            LOG_INFO("Config file changed, reloading...");
+            
+            // Reload configuration
+            std::string path = config_file_path_;
+            if (loadConfig(path)) {
+                LOG_INFO("Configuration reloaded successfully");
+            } else {
+                LOG_ERROR("Failed to reload configuration");
+            }
+        }
+        
+        // Check every second
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+}
+
+bool ConfigManager::checkConfigFileChanged() {
+    if (config_file_path_.empty()) {
+        return false;
+    }
+    
+    struct stat file_stat;
+    if (stat(config_file_path_.c_str(), &file_stat) != 0) {
+        return false;
+    }
+    
+    if (file_stat.st_mtime > last_modified_time_) {
+        last_modified_time_ = file_stat.st_mtime;
+        return true;
+    }
+    
+    return false;
 }
 
 } // namespace moneybot

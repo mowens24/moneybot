@@ -2,7 +2,7 @@
 #pragma once
 
 #include <nlohmann/json.hpp>
-#include "strategy.h"
+#include "legacy_strategy.h"
 #include "types.h"
 
 namespace moneybot {

@@ -106,4 +106,53 @@ struct OrderBookLevel {
     OrderBookLevel(double p, double q) : price(p), quantity(q) {}
 };
 
+struct MarketTick {
+    std::string symbol;
+    double bid;
+    double ask;
+    double last_price;
+    double volume;
+    std::chrono::system_clock::time_point timestamp;
+    
+    MarketTick() = default;
+};
+
+struct OrderUpdate {
+    std::string order_id;
+    std::string symbol;
+    OrderSide side;
+    OrderType type;
+    double quantity;
+    double price;
+    OrderStatus status;
+    double filled_quantity;
+    double avg_fill_price;
+    std::chrono::system_clock::time_point timestamp;
+    
+    OrderUpdate() = default;
+};
+
+struct TradeUpdate {
+    std::string trade_id;
+    std::string symbol;
+    OrderSide side;
+    double quantity;
+    double price;
+    double fee;
+    std::chrono::system_clock::time_point timestamp;
+    
+    TradeUpdate() = default;
+};
+
+struct MarketData {
+    std::string symbol;
+    double bid;
+    double ask;
+    double last_price;
+    double volume;
+    std::chrono::system_clock::time_point timestamp;
+    
+    MarketData() = default;
+};
+
 } // namespace moneybot 

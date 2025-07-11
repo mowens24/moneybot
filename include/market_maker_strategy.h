@@ -1,7 +1,7 @@
 #ifndef MARKET_MAKER_STRATEGY_H
 #define MARKET_MAKER_STRATEGY_H
 
-#include "strategy.h"
+#include "legacy_strategy.h"
 #include "order_book.h"
 #include "order_manager.h"
 #include "risk_manager.h"

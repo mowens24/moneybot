@@ -135,6 +135,7 @@ struct GUIState {
     bool show_risk_window = false;             // Hidden - integrated into portfolio
     bool show_strategy_window = false;         // Hidden - integrated into main dashboard
     bool show_main_dashboard = true;           // Visual algorithm hub
+    bool show_algorithm_visualization = true;  // Independent algorithm visualization window
     bool show_exchange_management = false;     // Available but not shown by default
     
     // Layout controls
@@ -537,6 +538,7 @@ void RenderMainMenuBar(GUIState& state) {
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("Dashboard")) {
             ImGui::MenuItem("Main Dashboard", "Ctrl+1", &state.show_main_dashboard);
+            ImGui::MenuItem("Algorithm Visualization", "Ctrl+A", &state.show_algorithm_visualization);
             ImGui::MenuItem("Portfolio", "Ctrl+2", &state.show_portfolio_window);
             ImGui::MenuItem("Market Data", "Ctrl+3", &state.show_market_data_window);
             ImGui::MenuItem("Arbitrage Scanner", "Ctrl+4", &state.show_arbitrage_window);
@@ -1762,68 +1764,240 @@ void DrawExchangeNetworkWidget(ImVec2 start_pos, ImVec2 size) {
 // ========================================================================
 
 void RenderAlgorithmVisualizationWindow(GUIState& state) {
-    ImGui::Begin("🔮 Algorithm Visualization Hub", &state.show_main_dashboard);
+    // Make this a completely independent, movable, and dockable window
+    if (!state.show_algorithm_visualization) return;
+    
+    ImGui::Begin("🎯 Algorithm Dashboard", &state.show_algorithm_visualization, ImGuiWindowFlags_None);
     
     ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "🚀 Real-Time Algorithm Performance Monitor");
     ImGui::Separator();
     
     // Get current window size for responsive layout
     ImVec2 window_size = ImGui::GetContentRegionAvail();
+    float section_height = fmax(150.0f, (window_size.y - 100.0f) / 3.0f);
     
-    // Triangle Arbitrage Section
+    // ========================================================================
+    // SECTION 1: Triangle Arbitrage Monitor
+    // ========================================================================
     ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "△ Triangle Arbitrage Monitor");
+    ImGui::Separator();
     
-    // Simulate triangle arbitrage data (replace with real algorithm data)
-    static float triangle_profit = 0.0f;
-    static bool triangle_active = false;
-    
-    if (state.isLiveMode()) {
-        // In live mode, show real opportunities (placeholder for now)
-        triangle_profit = 15.0f + sin(ImGui::GetTime() * 0.5f) * 8.0f;
-        triangle_active = triangle_profit > 10.0f;
-    } else {
-        // Demo mode with animated values
-        triangle_profit = 12.0f + sin(ImGui::GetTime() * 0.8f) * 6.0f;
-        triangle_active = triangle_profit > 8.0f;
+    if (ImGui::BeginChild("TriangleSection", ImVec2(0, section_height), true, ImGuiWindowFlags_None)) {
+        // Simulate triangle arbitrage data
+        static float triangle_profit = 0.0f;
+        static bool triangle_active = false;
+        
+        if (state.isLiveMode()) {
+            triangle_profit = 15.0f + sin(ImGui::GetTime() * 0.5f) * 8.0f;
+            triangle_active = triangle_profit > 10.0f;
+        } else {
+            triangle_profit = 12.0f + sin(ImGui::GetTime() * 0.8f) * 6.0f;
+            triangle_active = triangle_profit > 8.0f;
+        }
+        
+        // Draw triangle visualization
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
+        ImVec2 canvas_size = ImGui::GetContentRegionAvail();
+        
+        // Ensure minimum canvas size
+        if (canvas_size.x < 200.0f) canvas_size.x = 200.0f;
+        if (canvas_size.y < 100.0f) canvas_size.y = 100.0f;
+        
+        // Triangle setup
+        ImVec2 center = ImVec2(canvas_pos.x + canvas_size.x * 0.5f, canvas_pos.y + canvas_size.y * 0.4f);
+        float radius = fmin(canvas_size.x, canvas_size.y) * 0.2f;
+        
+        // Triangle points
+        ImVec2 p1 = ImVec2(center.x, center.y - radius);                          // Top (Binance)
+        ImVec2 p2 = ImVec2(center.x - radius * 0.866f, center.y + radius * 0.5f); // Bottom left (Coinbase)
+        ImVec2 p3 = ImVec2(center.x + radius * 0.866f, center.y + radius * 0.5f); // Bottom right (Kraken)
+        
+        // Draw animated edges with varying thickness
+        float time = (float)ImGui::GetTime();
+        float pulse1 = 2.0f + sin(time * 2.0f) * 1.5f;
+        float pulse2 = 2.0f + sin(time * 2.0f + 2.1f) * 1.5f;
+        float pulse3 = 2.0f + sin(time * 2.0f + 4.2f) * 1.5f;
+        
+        ImU32 color1 = triangle_active ? IM_COL32(0, 255, 0, 200) : IM_COL32(255, 100, 100, 200);
+        ImU32 color2 = triangle_active ? IM_COL32(0, 200, 255, 200) : IM_COL32(255, 200, 100, 200);
+        ImU32 color3 = triangle_active ? IM_COL32(255, 255, 0, 200) : IM_COL32(200, 200, 200, 200);
+        
+        draw_list->AddLine(p1, p2, color1, pulse1);
+        draw_list->AddLine(p2, p3, color2, pulse2);
+        draw_list->AddLine(p3, p1, color3, pulse3);
+        
+        // Draw exchange nodes with pulsing effect
+        float node_pulse = 10.0f + 3.0f * sin(time * 3.0f);
+        draw_list->AddCircleFilled(p1, node_pulse, IM_COL32(100, 150, 255, 255));
+        draw_list->AddCircleFilled(p2, node_pulse, IM_COL32(100, 150, 255, 255));
+        draw_list->AddCircleFilled(p3, node_pulse, IM_COL32(100, 150, 255, 255));
+        
+        // Add labels
+        draw_list->AddText(ImVec2(p1.x - 25, p1.y - 30), IM_COL32(255, 255, 255, 255), "Binance");
+        draw_list->AddText(ImVec2(p2.x - 35, p2.y + 15), IM_COL32(255, 255, 255, 255), "Coinbase");
+        draw_list->AddText(ImVec2(p3.x - 20, p3.y + 15), IM_COL32(255, 255, 255, 255), "Kraken");
+        
+        // Reserve space for the triangle and move cursor down
+        ImGui::Dummy(ImVec2(canvas_size.x, canvas_size.y * 0.7f));
+        
+        // Add profit metrics
+        ImGui::Text("Current Opportunity: %.1f bps", triangle_profit);
+        ImGui::SameLine();
+        ImGui::TextColored(triangle_active ? ImVec4(0.0f, 1.0f, 0.0f, 1.0f) : ImVec4(1.0f, 0.0f, 0.0f, 1.0f), 
+                          triangle_active ? "ACTIVE" : "INACTIVE");
+        
+        ImGui::EndChild();
     }
     
-    // Draw triangle arbitrage widget
-    ImVec2 triangle_center = ImVec2(window_size.x * 0.25f, 150.0f);
-    DrawTriangleArbitrageWidget(triangle_center, 60.0f, triangle_profit, 50000.0f, triangle_active);
+    ImGui::Spacing();
     
-    // Performance Gauges Section
-    ImGui::SetCursorPos(ImVec2(window_size.x * 0.5f, 50.0f));
-    ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "📊 Strategy Performance");
+    // ========================================================================
+    // SECTION 2: Performance Gauges
+    // ========================================================================
+    ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "⚡ Strategy Performance");
+    ImGui::Separator();
     
-    // Performance gauges
-    float win_rate = state.win_rate / 100.0f;
-    float profit_factor = fmin((state.daily_pnl + 5000.0f) / 10000.0f, 1.0f);
-    float risk_score = 1.0f - fmin(state.max_drawdown / 10.0f, 1.0f);
+    if (ImGui::BeginChild("PerformanceSection", ImVec2(0, section_height), true, ImGuiWindowFlags_None)) {
+        // Use columns for side-by-side gauges
+        ImGui::Columns(3, "PerfGauges", false);
+        
+        // Win Rate Gauge
+        ImGui::Text("Win Rate");
+        float win_rate_norm = state.win_rate / 100.0f;
+        ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(0.0f, 1.0f, 0.0f, 0.8f));
+        ImGui::ProgressBar(win_rate_norm, ImVec2(-1.0f, 0.0f), "");
+        ImGui::PopStyleColor();
+        ImGui::Text("%.1f%%", state.win_rate);
+        
+        ImGui::NextColumn();
+        
+        // Daily P&L Gauge
+        ImGui::Text("Daily P&L");
+        float pnl_norm = fmax(0.0f, fmin(1.0f, (state.daily_pnl + 2000.0f) / 4000.0f));
+        ImVec4 pnl_color = state.daily_pnl >= 0 ? ImVec4(0.0f, 1.0f, 0.0f, 0.8f) : ImVec4(1.0f, 0.0f, 0.0f, 0.8f);
+        ImGui::PushStyleColor(ImGuiCol_PlotHistogram, pnl_color);
+        ImGui::ProgressBar(pnl_norm, ImVec2(-1.0f, 0.0f), "");
+        ImGui::PopStyleColor();
+        ImGui::Text("$%.0f", state.daily_pnl);
+        
+        ImGui::NextColumn();
+        
+        // Risk Level Gauge
+        ImGui::Text("Risk Level");
+        float risk_norm = state.max_drawdown / 10.0f;
+        ImVec4 risk_color = risk_norm > 0.7f ? ImVec4(1.0f, 0.0f, 0.0f, 0.8f) : 
+                           risk_norm > 0.4f ? ImVec4(1.0f, 0.5f, 0.0f, 0.8f) : ImVec4(0.0f, 1.0f, 0.0f, 0.8f);
+        ImGui::PushStyleColor(ImGuiCol_PlotHistogram, risk_color);
+        ImGui::ProgressBar(risk_norm, ImVec2(-1.0f, 0.0f), "");
+        ImGui::PopStyleColor();
+        ImGui::Text("%.1f%%", state.max_drawdown);
+        
+        ImGui::Columns(1);
+        
+        ImGui::Spacing();
+        
+        // Additional metrics table
+        if (ImGui::BeginTable("PerfMetrics", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+            ImGui::TableSetupColumn("Metric");
+            ImGui::TableSetupColumn("Value");
+            ImGui::TableHeadersRow();
+            
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0); ImGui::Text("Total Trades");
+            ImGui::TableSetColumnIndex(1); ImGui::Text("%d", state.total_trades);
+            
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0); ImGui::Text("Sharpe Ratio");
+            ImGui::TableSetColumnIndex(1); ImGui::Text("%.2f", state.sharpe_ratio);
+            
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0); ImGui::Text("Portfolio Value");
+            ImGui::TableSetColumnIndex(1); ImGui::Text("$%.0f", state.portfolio_value);
+            
+            ImGui::EndTable();
+        }
+        
+        ImGui::EndChild();
+    }
     
-    ImVec2 gauge_start = ImVec2(window_size.x * 0.5f, 100.0f);
-    DrawPerformanceGauge(ImVec2(gauge_start.x, gauge_start.y), 35.0f, win_rate, "Win Rate", IM_COL32(0, 255, 0, 200));
-    DrawPerformanceGauge(ImVec2(gauge_start.x + 100, gauge_start.y), 35.0f, profit_factor, "Profit", IM_COL32(255, 165, 0, 200));
-    DrawPerformanceGauge(ImVec2(gauge_start.x + 200, gauge_start.y), 35.0f, risk_score, "Risk Control", IM_COL32(50, 150, 255, 200));
+    ImGui::Spacing();
     
-    // Exchange Network Section
-    ImGui::SetCursorPos(ImVec2(10.0f, 220.0f));
+    // ========================================================================
+    // SECTION 3: Exchange Network
+    // ========================================================================
     ImGui::TextColored(ImVec4(1.0f, 0.5f, 1.0f, 1.0f), "🌐 Exchange Network Status");
+    ImGui::Separator();
     
-    ImVec2 network_start = ImVec2(20.0f, 250.0f);
-    ImVec2 network_size = ImVec2(window_size.x - 40.0f, 200.0f);
-    DrawExchangeNetworkWidget(network_start, network_size);
+    if (ImGui::BeginChild("NetworkSection", ImVec2(0, section_height), true, ImGuiWindowFlags_None)) {
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
+        ImVec2 canvas_size = ImGui::GetContentRegionAvail();
+        
+        // Ensure minimum size
+        if (canvas_size.x < 300.0f) canvas_size.x = 300.0f;
+        if (canvas_size.y < 80.0f) canvas_size.y = 80.0f;
+        
+        // Draw exchange nodes in a horizontal line
+        float node_spacing = canvas_size.x / 4.0f;
+        float y_center = canvas_pos.y + canvas_size.y * 0.3f;
+        
+        std::vector<ImVec2> exchange_positions = {
+            ImVec2(canvas_pos.x + node_spacing * 0.5f, y_center),
+            ImVec2(canvas_pos.x + node_spacing * 1.5f, y_center),
+            ImVec2(canvas_pos.x + node_spacing * 2.5f, y_center),
+            ImVec2(canvas_pos.x + node_spacing * 3.5f, y_center)
+        };
+        
+        std::vector<std::string> exchange_names = {"Binance", "Coinbase", "Kraken", "FTX"};
+        std::vector<bool> connection_status = {true, true, false, false};
+        
+        // Draw connections between exchanges with animated flow
+        float time = (float)ImGui::GetTime();
+        for (size_t i = 0; i < exchange_positions.size() - 1; ++i) {
+            if (connection_status[i] && connection_status[i + 1]) {
+                float flow_intensity = 0.5f + 0.5f * sin(time * 2.0f + i);
+                float thickness = 1.0f + flow_intensity * 2.0f;
+                ImU32 color = IM_COL32(100, (int)(155 + flow_intensity * 100), 100, 200);
+                draw_list->AddLine(exchange_positions[i], exchange_positions[i + 1], color, thickness);
+            }
+        }
+        
+        // Draw exchange nodes
+        for (size_t i = 0; i < exchange_positions.size(); ++i) {
+            ImU32 node_color = connection_status[i] ? IM_COL32(0, 255, 0, 255) : IM_COL32(255, 0, 0, 255);
+            draw_list->AddCircleFilled(exchange_positions[i], 12.0f, node_color);
+            
+            // Add labels
+            ImVec2 text_pos = ImVec2(exchange_positions[i].x - 25, exchange_positions[i].y + 20);
+            draw_list->AddText(text_pos, IM_COL32(255, 255, 255, 255), exchange_names[i].c_str());
+        }
+        
+        // Reserve space for the network diagram
+        ImGui::Dummy(ImVec2(canvas_size.x, canvas_size.y * 0.6f));
+        
+        // Add network stats
+        if (state.isLiveMode()) {
+            auto stats = state.live_market_manager->getMarketStats();
+            ImGui::Text("Connected: %d/4 exchanges | Latency: %.1f ms", 
+                       stats.connected_exchanges, stats.avg_latency_ms);
+        } else {
+            ImGui::Text("Demo Mode: All exchanges simulated");
+        }
+        
+        ImGui::EndChild();
+    }
     
-    // Real-time stats footer
-    ImGui::SetCursorPos(ImVec2(10.0f, window_size.y - 60.0f));
+    // Footer with live stats
     ImGui::Separator();
     if (state.isLiveMode()) {
         auto stats = state.live_market_manager->getMarketStats();
-        ImGui::Text("🔴 LIVE | Exchanges: %d | Opportunities: %d | Latency: %.1fms | Updates: %d/sec", 
-                   stats.connected_exchanges, stats.arbitrage_opportunities, 
-                   stats.avg_latency_ms, stats.updates_per_second);
+        ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "🔴 LIVE MODE");
+        ImGui::Text("Opportunities: %d | Updates: %d/sec | Symbols: %d", 
+                   stats.arbitrage_opportunities, stats.updates_per_second, stats.total_symbols);
     } else {
-        ImGui::Text("🟡 DEMO | Simulation Active | P&L: $%.2f | Trades: %d | Sharpe: %.2f", 
-                   state.daily_pnl, state.total_trades, state.sharpe_ratio);
+        ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "🟡 DEMO MODE");
+        ImGui::Text("Simulation | P&L: $%.2f | Trades: %d", state.daily_pnl, state.total_trades);
     }
     
     ImGui::End();

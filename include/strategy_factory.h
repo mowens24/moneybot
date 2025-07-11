@@ -1,5 +1,5 @@
 #pragma once
-#include "strategy.h"
+#include "legacy_strategy.h"
 #include <nlohmann/json.hpp>
 #include <memory>
 #include <string>

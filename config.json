@@ -92,14 +92,26 @@
             "use_kalman_filter": true,
             "volatility_threshold": 0.05
         },
-        "cross_exchange_arbitrage": {
+        "cross_exchange_arbitrage_btc": {
+            "type": "cross_exchange_arbitrage",
             "enabled": true,
-            "min_profit_bps": 20.0,
-            "max_position_size": 0.01,
-            "max_latency_ms": 100.0,
-            "symbols": ["BTCUSDT", "ETHUSDT", "ADAUSDT", "DOTUSDT", "LINKUSDT"],
-            "include_fees": true,
-            "slippage_buffer_bps": 5.0
+            "symbol": "BTCUSDT",
+            "exchange_a": "binance",
+            "exchange_b": "coinbase",
+            "min_profit_bps": 15.0,
+            "max_position_size": 0.1,
+            "execution_timeout_ms": 3000,
+            "transfer_time_minutes": 5
+        },
+        "triangle_arbitrage_main": {
+            "type": "triangle_arbitrage",
+            "enabled": true,
+            "symbols": ["BTC", "ETH", "USDT"],
+            "exchanges": ["binance"],
+            "min_profit_bps": 10.0,
+            "max_position_size": 1000.0,
+            "execution_timeout_ms": 5000,
+            "slippage_tolerance_bps": 5.0
         },
         "portfolio_optimization": {
             "enabled": true,

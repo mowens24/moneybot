@@ -8,6 +8,62 @@
 #include <atomic>
 #include <mutex>
 #include <queue>
+#include <chrono>
+
+// ========================================================================
+// 🎨 ALGORITHM VISUALIZATION DATA STRUCTURES
+// ========================================================================
+
+struct TriangleArbOpportunity {
+    std::string symbol_a, symbol_b, symbol_c;  // e.g., BTC, ETH, USDT
+    std::string exchange_1, exchange_2, exchange_3;
+    double profit_bps = 0.0;
+    double volume_usd = 0.0;
+    double execution_probability = 0.0;
+    bool is_active = false;
+    std::chrono::steady_clock::time_point last_update;
+    
+    // Visual properties for animation
+    float visual_intensity = 0.0f;  // 0.0 to 1.0 for line thickness/color
+    float animation_phase = 0.5f;   // For pulsing/flowing animations
+};
+
+struct ExchangeFlowData {
+    std::string from_exchange, to_exchange;
+    double flow_volume_24h = 0.0;
+    double avg_profit_bps = 0.0;
+    int opportunities_count = 0;
+    bool is_flowing = false;
+    
+    // Visual animation properties
+    float flow_particles = 0.0f;    // Number of animated particles
+    float flow_speed = 1.0f;        // Speed of flow animation
+    // Note: Using struct Color as placeholder, convert to ImVec4 in implementation
+    struct Color { float r, g, b, a; 
+        Color() : r(0.0f), g(1.0f), b(0.0f), a(1.0f) {}
+        Color(float _r, float _g, float _b, float _a) : r(_r), g(_g), b(_b), a(_a) {}
+    } flow_color;
+};
+
+struct AlgorithmPerformance {
+    std::string algo_name;
+    double daily_pnl = 0.0;
+    double total_pnl = 0.0;
+    double win_rate = 0.0;           // 0.0 to 1.0
+    double sharpe_ratio = 0.0;
+    int trades_executed = 0;
+    bool is_active = true;
+    
+    // Visual gauge properties
+    float gauge_value = 0.0f;        // Current performance gauge (0.0 to 1.0)
+    float target_gauge = 0.0f;       // Target for smooth animation
+    struct Color { float r, g, b, a; 
+        Color() : r(0.0f), g(1.0f), b(0.0f), a(1.0f) {}
+        Color(float _r, float _g, float _b, float _a) : r(_r), g(_g), b(_b), a(_a) {}
+    } performance_color;
+};
+
+// ========================================================================
 
 class LiveMarketDataManager {
 private:
@@ -50,6 +106,13 @@ public:
     // Arbitrage opportunities
     std::vector<LiveArbitrageOpportunity> getArbitrageOpportunities(double min_profit_bps = 10.0);
     void setMinArbitrageProfitBps(double min_bps) { min_arbitrage_profit_bps = min_bps; }
+    
+    // Algorithm visualization data access
+    std::vector<TriangleArbOpportunity> getActiveTriangleOpportunities() const;
+    std::vector<ExchangeFlowData> getExchangeFlowData() const;
+    std::vector<AlgorithmPerformance> getAlgorithmPerformance() const;
+    double getTotalDailyPnL() const;
+    int getTotalActiveOpportunities() const;
     
     // Real-time statistics
     struct MarketStats {
