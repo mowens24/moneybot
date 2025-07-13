@@ -3,8 +3,10 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <chrono>
 #include "simple_logger.h"
 #include "config_manager.h"
+#include "core/exchange_manager.h"
 
 namespace moneybot {
 
@@ -22,9 +24,14 @@ public:
     std::string getVersion() const;
     int getUptime() const;
     
+    // Exchange information
+    bool areExchangesConnected() const;
+    std::vector<ExchangeStatus> getExchangeStatuses() const;
+    
 private:
     std::shared_ptr<SimpleLogger> logger_;
     ConfigManager& config_;
+    std::shared_ptr<ExchangeManager> exchange_manager_;
     bool is_running_ = false;
     std::chrono::steady_clock::time_point start_time_;
 };

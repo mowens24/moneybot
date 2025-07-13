@@ -22,6 +22,7 @@ set(CLI_SOURCES
     src/system_manager.cpp
     src/strategy_manager.cpp
     src/cli_command_processor.cpp
+    src/core/exchange_manager.cpp
 )
 
 # Create CLI executable

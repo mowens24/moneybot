@@ -35,6 +35,7 @@ private:
     int cmd_risk_check(const std::vector<std::string>& args);
     int cmd_config(const std::vector<std::string>& args);
     int cmd_version(const std::vector<std::string>& args);
+    int cmd_market(const std::vector<std::string>& args);
     
     // Utilities
     void print_usage();

@@ -5,6 +5,10 @@ namespace moneybot {
 
 SystemManager::SystemManager(std::shared_ptr<SimpleLogger> logger, ConfigManager& config)
     : logger_(logger), config_(config) {
+    
+    // Initialize exchange manager
+    exchange_manager_ = std::make_shared<ExchangeManager>(logger_, config_);
+    
     logger_->info("SystemManager initialized");
 }
 
@@ -16,10 +20,19 @@ bool SystemManager::start() {
     
     logger_->info("Starting MoneyBot trading system");
     
-    // TODO: Initialize actual trading components
-    // - Exchange connections
+    // Connect to exchanges
+    if (!exchange_manager_->connectToExchanges()) {
+        logger_->error("Failed to connect to exchanges");
+        return false;
+    }
+    
+    // Start market data streaming
+    exchange_manager_->startMarketDataStream();
+    
+    // TODO: Initialize other trading components
     // - Strategy controllers
     // - Risk managers
+    // - Order managers
     
     is_running_ = true;
     start_time_ = std::chrono::steady_clock::now();
@@ -36,10 +49,16 @@ bool SystemManager::stop() {
     
     logger_->info("Stopping MoneyBot trading system");
     
-    // TODO: Graceful shutdown of trading components
+    // Stop market data streaming
+    exchange_manager_->stopMarketDataStream();
+    
+    // Disconnect from exchanges
+    exchange_manager_->disconnectFromExchanges();
+    
+    // TODO: Graceful shutdown of other trading components
     // - Cancel all orders
     // - Close positions safely
-    // - Disconnect from exchanges
+    // - Save state
     
     is_running_ = false;
     
@@ -65,6 +84,14 @@ int SystemManager::getUptime() const {
     auto now = std::chrono::steady_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::minutes>(now - start_time_);
     return static_cast<int>(duration.count());
+}
+
+bool SystemManager::areExchangesConnected() const {
+    return exchange_manager_->isConnected();
+}
+
+std::vector<ExchangeStatus> SystemManager::getExchangeStatuses() const {
+    return exchange_manager_->getExchangeStatuses();
 }
 
 } // namespace moneybot
