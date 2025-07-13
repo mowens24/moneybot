@@ -1,6 +1,0 @@
-services:
-  comdockerdevenvironments:
-    image: comdockerdevenvironments
-    build:
-      context: .
-      dockerfile: ./Dockerfile

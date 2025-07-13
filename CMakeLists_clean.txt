@@ -14,14 +14,9 @@ if(APPLE)
     message(STATUS "Setting macOS SDK sysroot: ${CMAKE_OSX_SYSROOT}")
 endif()
 
-# Core source files (modular architecture)
+# Core source files (only existing, working files)
 set(CLI_SOURCES
     src/cli_main.cpp
-    src/config_manager.cpp
-    src/simple_portfolio_manager.cpp
-    src/system_manager.cpp
-    src/strategy_manager.cpp
-    src/cli_command_processor.cpp
 )
 
 # Create CLI executable
